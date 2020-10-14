@@ -14,7 +14,7 @@ import deepq
 
 import rospy
 
-from environment1 import Env1
+from new_environment import Env1
 
 import matplotlib.pyplot as plt
 
@@ -51,7 +51,7 @@ if __name__ == '__main__':
         #Each time we run through the entire dataset, it's called an epoch.
         #PARAMETER LIST
         epochs = 3000000
-        steps = 300
+        steps = 200
         updateTargetNetwork = 10000
         explorationRate = 1
         minibatch_size = 64
@@ -115,7 +115,7 @@ if __name__ == '__main__':
         loss_sum = 0.0
 
         # run until env returns done
-        while not done1:
+        for i in range(200):
 
             qValues1 = deepQ.getQValues(observation1)
             action1 = deepQ.selectAction(qValues1, explorationRate)
@@ -137,12 +137,13 @@ if __name__ == '__main__':
                     print history
                 # loss_sum += history.history['loss'][0]
 
-            episode_step += 1
+            episode_step = i + 1
 
-            if reward1 == 1:
+            if reward1 == 200:
                 service_count1 += 1
+                done1 = True
 
-            if done1 or episode_step >= 300:
+            if done1 or episode_step == 200:
                 done1 = True
                 last100Scores[last100ScoresIndex] = episode_step
                 last100ScoresIndex += 1
@@ -163,9 +164,10 @@ if __name__ == '__main__':
                         parameter_dictionary = dict(zip(parameter_keys, parameter_values))
                         with open(str(epoch)+'.json', 'w') as outfile:
                             json.dump(parameter_dictionary, outfile)
+                break
 
 
-            stepCounter += 2
+            stepCounter += 1
             if stepCounter % updateTargetNetwork == 0:
                 deepQ.updateTargetNetwork()
                 print ("updating target network")
