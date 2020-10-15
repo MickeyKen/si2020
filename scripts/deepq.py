@@ -10,6 +10,13 @@ from keras.utils import plot_model
 
 import memory
 
+import tensorflow as tf
+global graph
+import keras
+graph = tf.compat.v1.get_default_graph()
+session = keras.backend.get_session()
+init = tf.global_variables_initializer()
+session.run(init)
 
 class DeepQ:
     """
@@ -98,12 +105,14 @@ class DeepQ:
 
     # predict Q values for all the actions
     def getQValues(self, state):
-        predicted = self.model.predict(state.reshape(1,len(state)))
+        with graph.as_default():
+            predicted = self.model.predict(state.reshape(1,len(state)))
         return predicted[0]
 
     def getTargetQValues(self, state):
         #predicted = self.targetModel.predict(state.reshape(1,len(state)))
-        predicted = self.targetModel.predict(state.reshape(1,len(state)))
+        with graph.as_default():
+            predicted = self.targetModel.predict(state.reshape(1,len(state)))
 
         return predicted[0]
 
