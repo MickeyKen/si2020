@@ -18,7 +18,7 @@ from new_environment import Env1
 
 import matplotlib.pyplot as plt
 
-os.environ['ROS_MASTER_URI'] = "http://localhost:11350" + '/'
+os.environ['ROS_MASTER_URI'] = "http://localhost:11311" + '/'
 
 out_path = 'output.txt'
 loss_out_path = 'output_loss.txt'
@@ -44,7 +44,7 @@ if __name__ == '__main__':
     path = '/tmp/'
     # plotter = liveplot.LivePlot(outdir)
 
-    env1 = Env1(is_training)
+    env1 = Env1(is_training, "11350")
 
     if not continue_execution:
         #Each time we take a sample and update our weights it is called a mini-batch.

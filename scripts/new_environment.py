@@ -30,6 +30,7 @@ TILT_STEP = math.radians(3)
 
 class Env1():
     def __init__(self, is_training, ROS_MASTER_URI):
+        self.ros_master_uri = str(ROS_MASTER_URI)
         os.environ['ROS_MASTER_URI'] = "http://localhost:" + str(ROS_MASTER_URI) + '/'
         self.position = Pose()
         self.projector_position = Pose()
@@ -256,6 +257,14 @@ class Env1():
         return xp, yp, rxp, ryp, rq
 
     def reset(self):
+        self.pan_pub.publish(1.0)
+        data = None
+        while data is None:
+            try:
+                data = rospy.wait_for_message('/scan_filtered', LaserScan, timeout=5)
+            except:
+                pass
+        print data
 
         # Reset the env #
         rospy.wait_for_service('/gazebo/delete_model')
@@ -286,12 +295,13 @@ class Env1():
 
         human = False
         while not human:
+            print str(human) + "str(1)"
             rospy.wait_for_service('/gazebo/delete_model')
             try:
                 self.del_model('actor0')
             except rospy.ServiceException, e:
                 print ("Service call failed: %s" % e)
-
+            print str(human) + "str(2)"
             rospy.wait_for_service('/gazebo/spawn_sdf_model')
             try:
                 goal_urdf = open(goal_model_dir, "r").read()
@@ -302,6 +312,7 @@ class Env1():
                 self.goal(target.model_name, target.model_xml, 'namespace', self.goal_position, 'world')
             except (rospy.ServiceException) as e:
                 print("/gazebo/failed to build the target")
+            print str(human) + "str(3)"
 
             data = None
             while data is None:
@@ -310,6 +321,9 @@ class Env1():
                 except:
                     pass
             human = self.find_human(data)
+
+            print ("finished gazebo reset")
+        print ("iiiiiii")
 
         data = None
         while data is None:

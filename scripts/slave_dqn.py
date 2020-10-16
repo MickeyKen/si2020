@@ -16,7 +16,7 @@ from si2020_msgs.srv import *
 
 continue_execution = False
 
-class Server(Publishsers):
+class Server():
     def __init__(self):
         if not continue_execution:
 
@@ -73,6 +73,7 @@ class Server(Publishsers):
 
 
     def experiment_callback(self, msg):
+        print ("receive experience")
         observation = msg.observationself.data
         action = msg.action.data
         reward = msg.reward.data
@@ -94,6 +95,7 @@ class Server(Publishsers):
         self.stepCounter += 1
 
     def action_callback(self, req):
+        print ("receive action server")
         observation = req.observation.data
         explorationRate = req.explorationRate.data
 

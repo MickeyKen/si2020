@@ -9,16 +9,14 @@ from numpy import inf
 # from distutils.dir_util import copy_tree
 import os
 import json
-# import liveplot
-import deepq
 
 import rospy
 
 from new_environment import Env1
 
 
-from si2020.srv import *
-from si2020.msg import Experiment
+from si2020_msgs.srv import *
+from si2020_msgs.msg import Experiment
 
 out_path = 'output.txt'
 loss_out_path = 'output_loss.txt'
@@ -34,13 +32,19 @@ if __name__ == '__main__':
     rospy.init_node('train_frame')
 
     call_predict = rospy.ServiceProxy('/dqn/predict', PredictCommand)
-    experience_pub = rospy.Publisher('/dqn/experience', Experiment)
+    experience_pub = rospy.Publisher('/dqn/experience', Experiment, queue_size=10)
 
     args = sys.argv
     ROS_MASTER_URI = args[1]
     explorationRate = float(args[2])
+    print (str(ROS_MASTER_URI) + " , " + str(explorationRate))
 
     env = Env1(is_training, ROS_MASTER_URI)
+    print "declare environment"
+
+    epochs = 3000000
+    steps = 200
+    current_epoch = 0
 
     last100Scores = [0] * 100
     last100ScoresIndex = 0
@@ -56,6 +60,7 @@ if __name__ == '__main__':
     #start iterating from 'current epoch'.
     for epoch in xrange(current_epoch+1, epochs+1, 1):
         observation = env.reset()
+        print "reset"
         cumulated_reward = 0
         done = False
         episode_step = 0
@@ -70,7 +75,9 @@ if __name__ == '__main__':
             req.observation.data = observation
             req.explorationRate = explorationRate
             predict = call_predict(req)
+            print ("request" + str(ROS_MASTER_URI))
             action = predict.action.data
+            print action
 
             newObservation, reward, done, arrive, reach  = env.step(action, last_action)
             last_action = action
