@@ -12,7 +12,7 @@ import tf
 
 import numpy as np
 
-import deepq
+import deepq_pararell
 
 from std_msgs.msg import Bool
 from std_msgs.msg import Float64, Int16
