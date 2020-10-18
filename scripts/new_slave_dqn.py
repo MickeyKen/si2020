@@ -25,6 +25,26 @@ numberOfCpuCore_to_be_used = 2
 
 continue_execution = False
 
+if not continue_execution:
+
+    epochs = 3000000
+    steps = 200
+    updateTargetNetwork = 1000
+    explorationRate = 1
+    minibatch_size = 64
+    learnStart = 64
+    learningRate = 0.00025
+    discountFactor = 0.99
+    memorySize = 1000000
+    network_inputs = 541 + 1 + 2 + 1
+    network_outputs = 8
+
+    ### number of hiddenLayer ###
+    network_structure = [300,21]
+    current_epoch = 0
+
+    deepQ = deepq.DeepQ(network_inputs, network_outputs, memorySize, discountFactor, learningRate, learnStart)
+    deepQ.initNetworks(network_structure)
 
 class Worker(mp.Process):
     def __init__(self, someGlobalNumber, name):
@@ -35,32 +55,13 @@ class Worker(mp.Process):
 
         self.stepCounter = 0
 
-        if not continue_execution:
-
-            epochs = 3000000
-            steps = 200
-            updateTargetNetwork = 1000
-            explorationRate = 1
-            minibatch_size = 64
-            learnStart = 64
-            learningRate = 0.00025
-            discountFactor = 0.99
-            memorySize = 1000000
-            network_inputs = 541 + 1 + 2 + 1
-            network_outputs = 8
-
-            ### number of hiddenLayer ###
-            network_structure = [300,21]
-            current_epoch = 0
-
-            self.deepQ = deepq.DeepQ(network_inputs, network_outputs, memorySize, discountFactor, learningRate, learnStart)
-            self.deepQ.initNetworks(network_structure)
 
         self.updateTargetNetwork = updateTargetNetwork
         self.learnStart = learnStart
 
 
     def run(self):
+
 
         #to parallelizing
         os.environ['ROS_MASTER_URI'] = "http://localhost:113" + str(self.port) + '/'
@@ -73,17 +74,17 @@ class Worker(mp.Process):
             reward = msg.reward.data
             newObservation = msg.newObservation.data
             done = msg.done.data
-            self.deepQ.addMemory(np.asarray(observation), action, reward, np.asarray(newObservation), done)
+            deepQ.addMemory(np.asarray(observation), action, reward, np.asarray(newObservation), done)
 
             if self.stepCounter >= self.learnStart:
                 if self.stepCounter <= self.updateTargetNetwork:
-                    history = self.deepQ.learnOnMiniBatch(minibatch_size, False)
+                    history = deepQ.learnOnMiniBatch(minibatch_size, False)
                     # print "pass False"
                 else :
-                    history = self.deepQ.learnOnMiniBatch(minibatch_size, True)
+                    history = deepQ.learnOnMiniBatch(minibatch_size, True)
 
             if self.stepCounter % self.updateTargetNetwork == 0:
-                self.deepQ.updateTargetNetwork()
+                deepQ.updateTargetNetwork()
                 print ("updating target network")
 
             self.stepCounter += 1
@@ -91,12 +92,12 @@ class Worker(mp.Process):
         def predictAction(req):
             observation = req.observation.data
             explorationRate = req.explorationRate
-            print observation, explorationRate
-
-            qValues = self.deepQ.getQValues(np.asarray(observation))
+            print explorationRate
+            qValues = deepQ.getQValues(np.asarray(observation))
+            print "in"
 
             print qValues
-            action = self.deepQ.selectAction(qValues, explorationRate)
+            action = deepQ.selectAction(qValues, explorationRate)
 
             print action
             res = Int16()
@@ -110,9 +111,7 @@ class Worker(mp.Process):
 
 
 
-        while not rospy.is_shutdown():
-            print "loading"
-            rate.sleep()
+        rospy.spin()
 
 
 
@@ -123,6 +122,8 @@ class Worker(mp.Process):
 if __name__ == "__main__":
     #initializing some shared values between process
     global_number = mp.Value('i', 0)
+    lock = mp.Lock()
+    lock.acquire(block=True)
 
     # parallel training
     workers = [Worker(global_number, i) for i in range(numberOfCpuCore_to_be_used)]
