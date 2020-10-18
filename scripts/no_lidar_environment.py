@@ -17,7 +17,7 @@ from gazebo_msgs.srv import SpawnModel, DeleteModel
 from gazebo_msgs.msg import ModelStates
 from gazebo_msgs.srv import SetModelState, SetModelStateRequest
 
-diagonal_dis = math.sqrt(2) * (3.6 + 3.8)
+diagonal_dis = 6.68
 goal_model_dir = os.path.join(os.path.split(os.path.realpath(__file__))[0], '..'
                                 , 'models', 'person_standing', 'model.sdf')
 
@@ -98,7 +98,7 @@ class Env1():
         else:
              yaw = yaw + 360
 
-        self.yaw = yaw
+        self.yaw = 0
 
 
     def getProjState(self):
@@ -194,11 +194,11 @@ class Env1():
         reward = -1
 
         if done:
-            reward = -100
+            reward = -200
             self.pub_cmd_vel.publish(Twist())
 
         if arrive and reach:
-            reward = 200
+            reward = 150
             done = True
 
         return reward, arrive, reach, done
@@ -256,12 +256,12 @@ class Env1():
         state, rel_dis, yaw, diff_angle, diff_distance, done, arrive = self.getState(data)
         state = [i / 25. for i in state]
 
-        state.append(past_action)
-        state.append(self.pan_ang)
-        state.append(self.tilt_ang)
-        state.append(self.v)
-        state.append(diff_angle)
-        state.append(diff_distance)
+        state.append(self.constrain(self.pan_ang / PAN_LIMIT, -1.0, 1.0))
+        state.append(self.constrain(self.tilt_ang / TILT_MAX_LIMIT, -1.0, 1.0))
+        state.append(self.constrain(self.v, -1.0, 1.0))
+
+        state.append(diff_angle / 180)
+        state.append(self.constrain(diff_distance / diagonal_dis, -1.0, 1.0))
         # state = state + [yaw / 360, rel_theta / 360, diff_angle / 180]
         reward, arrive, reach, done = self.setReward(done, arrive)
 
@@ -357,12 +357,13 @@ class Env1():
 
         state, rel_dis, yaw, diff_angle, diff_distance, done, arrive = self.getState(data)
         state = [i / 25. for i in state]
-        state.append(0)
+
         state.append(0.0)
-        state.append(TILT_MIN_LIMIT)
-        state.append(self.v)
-        state.append(diff_angle)
-        state.append(diff_distance)
+        state.append(TILT_MIN_LIMIT / TILT_MAX_LIMIT)
+        state.append(self.constrain(self.v, -1.0, 1.0))
+
+        state.append(diff_angle / 180)
+        state.append(self.constrain(diff_distance / diagonal_dis, -1.0, 1.0))
 
         # state = state + [yaw / 360, rel_theta / 360, diff_angle / 180]
 

@@ -51,7 +51,7 @@ if __name__ == '__main__':
         #Each time we run through the entire dataset, it's called an epoch.
         #PARAMETER LIST
         epochs = 3000000
-        steps = 200
+        steps = 150
         updateTargetNetwork = 10000
         explorationRate = 1
         minibatch_size = 64
@@ -59,11 +59,11 @@ if __name__ == '__main__':
         learningRate = 0.00025
         discountFactor = 0.99
         memorySize = 1000000
-        network_inputs = 8
+        network_inputs = 7
         network_outputs = 8
 
         ### number of hiddenLayer ###
-        network_structure = [32,32]
+        network_structure = [56,28]
         current_epoch = 0
 
         deepQ = deepq.DeepQ(network_inputs, network_outputs, memorySize, discountFactor, learningRate, learnStart)
@@ -115,7 +115,7 @@ if __name__ == '__main__':
         loss_sum = 0.0
 
         # run until env returns done
-        for i in range(200):
+        for i in range(150):
 
             qValues1 = deepQ.getQValues(observation1)
             action1 = deepQ.selectAction(qValues1, explorationRate)
@@ -139,11 +139,11 @@ if __name__ == '__main__':
 
             episode_step = i + 1
 
-            if reward1 == 200:
+            if reward1 == 150:
                 service_count1 += 1
                 done1 = True
 
-            if done1 or episode_step == 200:
+            if done1 or episode_step == 150:
                 done1 = True
                 last100Scores[last100ScoresIndex] = episode_step
                 last100ScoresIndex += 1
