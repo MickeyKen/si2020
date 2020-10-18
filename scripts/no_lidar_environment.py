@@ -28,18 +28,18 @@ TILT_MAX_LIMIT = math.radians(90) - math.atan(1.5/0.998)
 PAN_STEP = math.radians(15)
 TILT_STEP = math.radians(3)
 
-os.environ['ROS_MASTER_URI'] = "http://localhost:11350" + '/'
-
 class Env1():
-    def __init__(self, is_training):
+    def __init__(self, is_training, ROS_MASTER_URI):
+        os.environ['ROS_MASTER_URI'] = "http://localhost:" + str(ROS_MASTER_URI) + '/'
         self.position = Pose()
         self.projector_position = Pose()
         self.goal_position = Pose()
         self.goal_projector_position = Pose()
-        self.pub_cmd_vel = rospy.Publisher('/ubiquitous_display/cmd_vel', Twist, queue_size=10)
+
+        self.pub_cmd_vel = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
         self.sub_odom = rospy.Subscriber('/gazebo/model_states', ModelStates, self.getPose)
-        # self.sub_jsp = rospy.Subscriber('/ubiquitous_display/joint_states', JointState, self.getJsp)
-        self.reset_proxy = rospy.ServiceProxy('gazebo/reset_world', Empty)
+
+        self.reset_proxy = rospy.ServiceProxy('gazebo/reset_simulation', Empty)
         self.unpause_proxy = rospy.ServiceProxy('gazebo/unpause_physics', Empty)
         self.pause_proxy = rospy.ServiceProxy('gazebo/pause_physics', Empty)
         self.goal = rospy.ServiceProxy('/gazebo/spawn_sdf_model', SpawnModel)
@@ -52,12 +52,12 @@ class Env1():
         self.past_distance_rate = 0.
         self.past_projector_distance = 0.
         self.yaw = 0
-        self.rel_theta = 0
-        self.diff_angle = 0
         self.pan_ang = 0.
         self.tilt_ang = 0.
         self.v = 0.
         self.ud_x = 0.
+        self.diff_distance = 0.
+        self.diff_angle = 0.
 
         self.ud_spawn = rospy.ServiceProxy('/gazebo/set_model_state', SetModelState)
 
@@ -80,24 +80,10 @@ class Env1():
 
         return input
 
-    def getGoalDistace(self):
-        goal_distance = math.hypot(self.goal_position.position.x - self.position.position.x, self.goal_position.position.y - self.position.position.y)
-        self.past_distance = goal_distance
+    def getGoalDistace(self, x_distance, y_distance):
+        goal_distance = math.hypot(x_distance, y_distance)
 
         return goal_distance
-
-    def setUDposition(self, x, y):
-        rospy.wait_for_service('/gazebo/set_model_state')
-        try:
-            srv = SetModelStateRequest()
-            srv.model_state.model_name = 'ubiquitous_display'
-            srv.model_state.reference_frame = 'world'  # the same with sdf name
-            srv.model_state.pose.position.x = x
-            srv.model_state.pose.position.y = y
-            srv.model_state.pose.orientation.w = 1
-            self.ud_spawn(srv)
-        except (rospy.ServiceException) as e:
-            print("/gazebo/failed to build the target")
 
     def getPose(self, pose):
         self.position = pose.pose[pose.name.index("ubiquitous_display")]
@@ -112,43 +98,8 @@ class Env1():
         else:
              yaw = yaw + 360
 
-        rel_dis_x = round(self.goal_projector_position.position.x - self.position.position.x, 1)
-        rel_dis_y = round(self.goal_projector_position.position.y - self.position.position.y, 1)
-
-        # Calculate the angle between robot and target
-        if rel_dis_x > 0 and rel_dis_y > 0:
-            theta = math.atan(rel_dis_y / rel_dis_x)
-        elif rel_dis_x > 0 and rel_dis_y < 0:
-            theta = 2 * math.pi + math.atan(rel_dis_y / rel_dis_x)
-        elif rel_dis_x < 0 and rel_dis_y < 0:
-            theta = math.pi + math.atan(rel_dis_y / rel_dis_x)
-        elif rel_dis_x < 0 and rel_dis_y > 0:
-            theta = math.pi + math.atan(rel_dis_y / rel_dis_x)
-        elif rel_dis_x == 0 and rel_dis_y > 0:
-            theta = 1 / 2 * math.pi
-        elif rel_dis_x == 0 and rel_dis_y < 0:
-            theta = 3 / 2 * math.pi
-        elif rel_dis_y == 0 and rel_dis_x > 0:
-            theta = 0
-        else:
-            theta = math.pi
-        rel_theta = round(math.degrees(theta), 2)
-
-        diff_angle = abs(rel_theta - yaw)
-
-        if diff_angle <= 180:
-            diff_angle = round(diff_angle, 2)
-        else:
-            diff_angle = round(360 - diff_angle, 2)
-
-        self.rel_theta = rel_theta
         self.yaw = yaw
-        self.diff_angle = diff_angle
 
-        # view_msg = Float64MultiArray()
-        # view_msg.data = [self.position.position.x,self.position.position.y,self.projector_position.position.x,self.projector_position.position.y, self.goal_position.position.x, self.goal_position.position.y, self.goal_projector_position.position.x, self.goal_projector_position.position.y]
-        # self.view_pub.publish(view_msg)
-        # view_plot_pose.view(self.position.position.x,self.position.position.y,self.projector_position.position.x,self.projector_position.position.y, self.goal_position.position.x, self.goal_position.position.y, self.goal_projector_position.position.x, self.goal_projector_position.position.y)
 
     def getProjState(self):
         reach = False
@@ -168,19 +119,48 @@ class Env1():
     def getState(self, scan):
         scan_range = []
         yaw = self.yaw
-        rel_theta = self.rel_theta
-        diff_angle = self.diff_angle
-        min_range = 0.4 + 0.271
+        min_range = 0.8
         done = False
         arrive = False
 
-        for i in range(len(scan.ranges)):
-            if scan.ranges[i] == float('Inf'):
-                scan_range.append(30.)
-            elif np.isnan(scan.ranges[i]):
-                scan_range.append(0)
-            else:
-                scan_range.append(scan.ranges[i])
+        rel_dis_x = round(self.goal_projector_position.position.x - self.position.position.x, 1)
+        rel_dis_y = round(self.goal_projector_position.position.y - self.position.position.y, 1)
+        diff_distance = self.getGoalDistace(rel_dis_x, rel_dis_y)
+
+        if rel_dis_x > 0 and rel_dis_y > 0:
+            theta = math.atan(rel_dis_y / rel_dis_x)
+        elif rel_dis_x > 0 and rel_dis_y < 0:
+            theta = 2 * math.pi + math.atan(rel_dis_y / rel_dis_x)
+        elif rel_dis_x < 0 and rel_dis_y < 0:
+            theta = math.pi + math.atan(rel_dis_y / rel_dis_x)
+        elif rel_dis_x < 0 and rel_dis_y > 0:
+            theta = math.pi + math.atan(rel_dis_y / rel_dis_x)
+        elif rel_dis_x == 0 and rel_dis_y > 0:
+            theta = 1 / 2 * math.pi
+        elif rel_dis_x == 0 and rel_dis_y < 0:
+            theta = 3 / 2 * math.pi
+        elif rel_dis_y == 0 and rel_dis_x > 0:
+            theta = 0
+        else:
+            theta = math.pi
+
+        rel_theta = round(math.degrees(theta), 2)
+        diff_angle = abs(rel_theta - yaw)
+
+        if diff_angle <= 180:
+            diff_angle = round(diff_angle, 2)
+        else:
+            diff_angle = round(360 - diff_angle, 2)
+
+        # for i in range(len(scan.ranges)):
+        #     if scan.ranges[i] == float('Inf'):
+        #         scan_range.append(30.)
+        #     elif np.isnan(scan.ranges[i]):
+        #         scan_range.append(0)
+        #     else:
+        #         scan_range.append(scan.ranges[i])
+        scan_range.append(scan.ranges[0])
+        scan_range.append(scan.ranges[540])
 
         if min_range > min(scan_range) > 0:
             done = True
@@ -190,9 +170,10 @@ class Env1():
             # done = True
             arrive = True
 
-        return scan_range, current_distance, yaw, rel_theta, diff_angle, done, arrive
+        return scan_range, current_distance, yaw, diff_angle, diff_distance, done, arrive
 
     def setReward(self, done, arrive):
+        step_reward = 0.0
         current_distance = math.hypot(self.goal_projector_position.position.x - self.position.position.x, self.goal_projector_position.position.y - self.position.position.y)
         # distance_rate = (self.past_distance - current_distance)
 
@@ -208,51 +189,27 @@ class Env1():
         else:
             r_p = 0
 
-        reward = self.constrain(0.5 - (r_c + r_p + abs(self.v)), 0.0, 0.5)
-        # reward = 1 - (r_c + r_p + abs(self.v))
+        step_reward = self.constrain(0.5 - (r_c + r_p + abs(self.v)), 0.0, 0.5)
+        # reward = -1 + step_reward
+        reward = -1
 
         if done:
-            reward = -1.
+            reward = -100
             self.pub_cmd_vel.publish(Twist())
 
         if arrive and reach:
-            reward = 1.
-            self.setUDposition(self.position.position.x, 0.0)
+            reward = 200
+            done = True
 
-            human = False
-            while not human:
-                rospy.wait_for_service('/gazebo/delete_model')
-                try:
-                    self.del_model('actor0')
-                except rospy.ServiceException, e:
-                    print ("Service call failed: %s" % e)
-
-                rospy.wait_for_service('/gazebo/spawn_sdf_model')
-                try:
-                    goal_urdf = open(goal_model_dir, "r").read()
-                    target = SpawnModel
-                    target.model_name = 'actor0'  # the same with sdf name
-                    target.model_xml = goal_urdf
-                    self.goal_position.position.x, self.goal_position.position.y, self.goal_projector_position.position.x, self.goal_projector_position.position.y, self.goal_position.orientation = self.cal_actor_pose(2.5)
-                    self.goal(target.model_name, target.model_xml, 'namespace', self.goal_position, 'world')
-                except (rospy.ServiceException) as e:
-                    print("/gazebo/failed to build the target")
-                rospy.sleep(0.1)
-
-                data = None
-                while data is None:
-                    try:
-                        data = rospy.wait_for_message('/scan_filtered', LaserScan, timeout=5)
-                    except:
-                        pass
-                human = self.find_human(data)
-
-            # self.goal_distance = self.getGoalDistace()
-
-        return reward, arrive, reach
+        return reward, arrive, reach, done
 
 
     def step(self, action, past_action):
+        rospy.wait_for_service('/gazebo/unpause_physics')
+        try:
+            self.unpause_proxy()
+        except (rospy.ServiceException) as e:
+            print ("/gazebo/unpause_physics service call failed")
 
         vel_cmd = Twist()
         if action == 0:
@@ -280,7 +237,7 @@ class Env1():
         else:
             print ("Error action is from 0 to 6")
 
-        time.sleep(0.3)
+        time.sleep(0.2)
 
         data = None
         while data is None:
@@ -289,17 +246,24 @@ class Env1():
             except:
                 pass
 
+        rospy.wait_for_service('/gazebo/pause_physics')
+        try:
+            #resp_pause = pause.call()
+            self.pause_proxy()
+        except (rospy.ServiceException) as e:
+            print ("/gazebo/pause_physics service call failed")
 
-        state, rel_dis, yaw, rel_theta, diff_angle, done, arrive = self.getState(data)
-        state = [i / 30. for i in state]
+        state, rel_dis, yaw, diff_angle, diff_distance, done, arrive = self.getState(data)
+        state = [i / 25. for i in state]
 
         state.append(past_action)
         state.append(self.pan_ang)
         state.append(self.tilt_ang)
         state.append(self.v)
-
+        state.append(diff_angle)
+        state.append(diff_distance)
         # state = state + [yaw / 360, rel_theta / 360, diff_angle / 180]
-        reward, arrive, reach = self.setReward(done, arrive)
+        reward, arrive, reach, done = self.setReward(done, arrive)
 
         return np.asarray(state), reward, done, reach, arrive
 
@@ -330,13 +294,25 @@ class Env1():
         except rospy.ServiceException, e:
             print ("Service call failed: %s" % e)
 
+        rospy.wait_for_service('gazebo/reset_simulation')
+        try:
+            self.reset_proxy()
+        except (rospy.ServiceException) as e:
+            print("gazebo/reset_world service call failed")
+
+        # Unpause simulation to make observation
+        rospy.wait_for_service('/gazebo/unpause_physics')
+        try:
+            #resp_pause = pause.call()
+            self.unpause_proxy()
+        except (rospy.ServiceException) as e:
+            print ("/gazebo/unpause_physics service call failed")
         self.pan_ang = 0.0
         self.tilt_ang = TILT_MIN_LIMIT
 
         self.pan_pub.publish(self.pan_ang)
         self.tilt_pub.publish(self.tilt_ang)
         self.pub_cmd_vel.publish(Twist())
-        self.setUDposition(0.0, 0.0)
 
         human = False
         while not human:
@@ -356,7 +332,6 @@ class Env1():
                 self.goal(target.model_name, target.model_xml, 'namespace', self.goal_position, 'world')
             except (rospy.ServiceException) as e:
                 print("/gazebo/failed to build the target")
-            rospy.sleep(0.1)
 
             data = None
             while data is None:
@@ -373,16 +348,21 @@ class Env1():
             except:
                 pass
 
+        rospy.wait_for_service('/gazebo/pause_physics')
+        try:
+            #resp_pause = pause.call()
+            self.pause_proxy()
+        except (rospy.ServiceException) as e:
+            print ("/gazebo/pause_physics service call failed")
 
-        # self.past_distance_rate, reach = self.getProjState()
-        # self.goal_distance = self.getGoalDistace()
-        state, rel_dis, yaw, rel_theta, diff_angle, done, arrive = self.getState(data)
-        state = [i / 30. for i in state]
-
+        state, rel_dis, yaw, diff_angle, diff_distance, done, arrive = self.getState(data)
+        state = [i / 25. for i in state]
         state.append(0)
         state.append(0.0)
         state.append(TILT_MIN_LIMIT)
         state.append(self.v)
+        state.append(diff_angle)
+        state.append(diff_distance)
 
         # state = state + [yaw / 360, rel_theta / 360, diff_angle / 180]
 

@@ -14,14 +14,14 @@ import deepq
 
 import rospy
 
-from environment1 import Env1
+from no_lidar_environment import Env1
 
 import matplotlib.pyplot as plt
 
-os.environ['ROS_MASTER_URI'] = "http://localhost:11351" + '/'
+os.environ['ROS_MASTER_URI'] = "http://localhost:11350" + '/'
 
-out_path = 'output.txt'
-loss_out_path = 'output_loss.txt'
+out_path = 'env_max_200_output_3.txt'
+loss_out_path = 'env_max_200_output_loss_3.txt'
 is_training = True
 
 continue_execution = False
@@ -44,14 +44,14 @@ if __name__ == '__main__':
     path = '/tmp/'
     # plotter = liveplot.LivePlot(outdir)
 
-    env1 = Env1(is_training)
+    env1 = Env1(is_training, "11350")
 
     if not continue_execution:
         #Each time we take a sample and update our weights it is called a mini-batch.
         #Each time we run through the entire dataset, it's called an epoch.
         #PARAMETER LIST
         epochs = 3000000
-        steps = 300
+        steps = 200
         updateTargetNetwork = 10000
         explorationRate = 1
         minibatch_size = 64
@@ -59,11 +59,11 @@ if __name__ == '__main__':
         learningRate = 0.00025
         discountFactor = 0.99
         memorySize = 1000000
-        network_inputs = 541 + 1 + 2 + 1
+        network_inputs = 8
         network_outputs = 8
 
         ### number of hiddenLayer ###
-        network_structure = [300,21]
+        network_structure = [32,32]
         current_epoch = 0
 
         deepQ = deepq.DeepQ(network_inputs, network_outputs, memorySize, discountFactor, learningRate, learnStart)
@@ -115,7 +115,7 @@ if __name__ == '__main__':
         loss_sum = 0.0
 
         # run until env returns done
-        while not done1:
+        for i in range(200):
 
             qValues1 = deepQ.getQValues(observation1)
             action1 = deepQ.selectAction(qValues1, explorationRate)
@@ -134,15 +134,16 @@ if __name__ == '__main__':
                 else :
                     history = deepQ.learnOnMiniBatch(minibatch_size, True)
                     # print "pass True"
-                    print history
-                # loss_sum += history.history['loss'][0]
+                    # print history
+                loss_sum += history.history['loss'][0]
 
-            episode_step += 1
+            episode_step = i + 1
 
-            if reward1 == 1:
+            if reward1 == 200:
                 service_count1 += 1
+                done1 = True
 
-            if done1 or episode_step >= 300:
+            if done1 or episode_step == 200:
                 done1 = True
                 last100Scores[last100ScoresIndex] = episode_step
                 last100ScoresIndex += 1
@@ -163,9 +164,10 @@ if __name__ == '__main__':
                         parameter_dictionary = dict(zip(parameter_keys, parameter_values))
                         with open(str(epoch)+'.json', 'w') as outfile:
                             json.dump(parameter_dictionary, outfile)
+                break
 
 
-            stepCounter += 2
+            stepCounter += 1
             if stepCounter % updateTargetNetwork == 0:
                 deepQ.updateTargetNetwork()
                 print ("updating target network")
