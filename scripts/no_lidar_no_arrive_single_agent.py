@@ -14,14 +14,14 @@ import deepq
 
 import rospy
 
-from no_lidar_environment import Env1
+from no_lidar_no_arrive_environment import Env1
 
 import matplotlib.pyplot as plt
 
-os.environ['ROS_MASTER_URI'] = "http://localhost:11351" + '/'
+os.environ['ROS_MASTER_URI'] = "http://localhost:11362" + '/'
 
-out_path = 'env_max_200_output_test_1019_1.txt'
-loss_out_path = 'env_max_200_output_loss_test_1019_1.txt'
+out_path = 'env_max_200_output_test_1019_2.txt'
+loss_out_path = 'env_max_200_output_loss_test_1019_2.txt'
 is_training = True
 
 continue_execution = False
@@ -44,7 +44,7 @@ if __name__ == '__main__':
     path = '/tmp/'
     # plotter = liveplot.LivePlot(outdir)
 
-    env1 = Env1(is_training, "11351")
+    env1 = Env1(is_training, "11362")
 
     if not continue_execution:
         #Each time we take a sample and update our weights it is called a mini-batch.

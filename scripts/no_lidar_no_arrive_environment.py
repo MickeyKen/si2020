@@ -22,8 +22,8 @@ goal_model_dir = os.path.join(os.path.split(os.path.realpath(__file__))[0], '..'
                                 , 'models', 'person_standing', 'model.sdf')
 
 PAN_LIMIT = math.radians(90)  #2.9670
-TILT_MIN_LIMIT = math.radians(90) - math.atan(3.0/0.998)
-TILT_MAX_LIMIT = math.radians(90) - math.atan(1.5/0.998)
+TILT_MIN_LIMIT = math.radians(90) - math.atan(4.0/0.998)
+TILT_MAX_LIMIT = math.radians(90) - math.atan(1.0/0.998)
 
 PAN_STEP = math.radians(15)
 TILT_STEP = math.radians(3)
@@ -179,7 +179,7 @@ class Env1():
             reward = -200
             self.pub_cmd_vel.publish(Twist())
 
-        if arrive and reach:
+        if reach:
             reward = 150
             done = True
 
