@@ -39,7 +39,7 @@ class Env1():
         self.pub_cmd_vel = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
         self.sub_odom = rospy.Subscriber('/gazebo/model_states', ModelStates, self.getPose)
 
-        self.reset_proxy = rospy.ServiceProxy('gazebo/reset_simulation', Empty)
+        self.reset_proxy = rospy.ServiceProxy('gazebo/reset_world', Empty)
         self.unpause_proxy = rospy.ServiceProxy('gazebo/unpause_physics', Empty)
         self.pause_proxy = rospy.ServiceProxy('gazebo/pause_physics', Empty)
         self.goal = rospy.ServiceProxy('/gazebo/spawn_sdf_model', SpawnModel)
@@ -125,20 +125,20 @@ class Env1():
 
         rel_dis_x = round(self.goal_projector_position.position.x - self.position.position.x, 1)
         rel_dis_y = round(self.goal_projector_position.position.y - self.position.position.y, 1)
-        diff_distance = self.getGoalDistace(rel_dis_x, rel_dis_y)
+        diff_distance = math.hypot(self.goal_projector_position.position.x- self.position.position.x, self.goal_projector_position.position.y - self.position.position.y)
 
         if rel_dis_x > 0 and rel_dis_y > 0:
             theta = math.atan(rel_dis_y / rel_dis_x)
         elif rel_dis_x > 0 and rel_dis_y < 0:
-            theta = 2 * math.pi + math.atan(rel_dis_y / rel_dis_x)
+            theta = 2.0 * math.pi + math.atan(rel_dis_y / rel_dis_x)
         elif rel_dis_x < 0 and rel_dis_y < 0:
-            theta = math.pi + math.atan(rel_dis_y / rel_dis_x)
+            theta = math.pi + abs(math.atan(rel_dis_y / rel_dis_x))
         elif rel_dis_x < 0 and rel_dis_y > 0:
             theta = math.pi + math.atan(rel_dis_y / rel_dis_x)
         elif rel_dis_x == 0 and rel_dis_y > 0:
-            theta = 1 / 2 * math.pi
+            theta = 1.0 / 2.0 * math.pi
         elif rel_dis_x == 0 and rel_dis_y < 0:
-            theta = 3 / 2 * math.pi
+            theta = 3.0 / 2.0 * math.pi
         elif rel_dis_y == 0 and rel_dis_x > 0:
             theta = 0
         else:
@@ -147,50 +147,32 @@ class Env1():
         rel_theta = round(math.degrees(theta), 2)
         diff_angle = abs(rel_theta - yaw)
 
+        print "rel_dis_x: ",rel_dis_x, ", rel_dis_y: ", rel_dis_y, ", rel_theta: ", rel_theta, ", diff_angle: ", diff_angle
+
         if diff_angle <= 180:
             diff_angle = round(diff_angle, 2)
         else:
             diff_angle = round(360 - diff_angle, 2)
 
-        # for i in range(len(scan.ranges)):
-        #     if scan.ranges[i] == float('Inf'):
-        #         scan_range.append(30.)
-        #     elif np.isnan(scan.ranges[i]):
-        #         scan_range.append(0)
-        #     else:
-        #         scan_range.append(scan.ranges[i])
         scan_range.append(scan.ranges[0])
         scan_range.append(scan.ranges[540])
 
         if min_range > min(scan_range) > 0:
             done = True
 
-        current_distance = math.hypot(self.goal_projector_position.position.x- self.position.position.x, self.goal_projector_position.position.y - self.position.position.y)
-        if current_distance >= self.min_threshold_arrive and current_distance <= self.max_threshold_arrive:
+        # current_distance = math.hypot(self.goal_projector_position.position.x- self.position.position.x, self.goal_projector_position.position.y - self.position.position.y)
+        if diff_distance >= self.min_threshold_arrive and diff_distance <= self.max_threshold_arrive:
             # done = True
             arrive = True
 
-        return scan_range, current_distance, yaw, diff_angle, diff_distance, done, arrive
+        # print "diff_distance: ", diff_distance, ", diff_angle: ", diff_angle
+
+        return scan_range, diff_distance, yaw, diff_angle, diff_distance, done, arrive
 
     def setReward(self, done, arrive):
-        step_reward = 0.0
-        current_distance = math.hypot(self.goal_projector_position.position.x - self.position.position.x, self.goal_projector_position.position.y - self.position.position.y)
-        # distance_rate = (self.past_distance - current_distance)
 
-        if current_distance >= 2.25:
-            r_c = ((2.25 - current_distance) ** 2) / 4
-        else:
-            r_c = 1 - (current_distance / 2.25)
+        _, reach = self.getProjState()
 
-        current_projector_distance, reach = self.getProjState()
-
-        if current_projector_distance >= 0.25:
-            r_p = ((0.25 - current_projector_distance) ** 2) / 4
-        else:
-            r_p = 0
-
-        step_reward = self.constrain(0.5 - (r_c + r_p + abs(self.v)), 0.0, 0.5)
-        # reward = -1 + step_reward
         reward = -1
 
         if done:
@@ -262,6 +244,7 @@ class Env1():
 
         state.append(diff_angle / 180)
         state.append(self.constrain(diff_distance / diagonal_dis, -1.0, 1.0))
+        print state
         # state = state + [yaw / 360, rel_theta / 360, diff_angle / 180]
         reward, arrive, reach, done = self.setReward(done, arrive)
 
