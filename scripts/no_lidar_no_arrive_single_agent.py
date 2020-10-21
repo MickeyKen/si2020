@@ -18,10 +18,10 @@ from no_lidar_no_arrive_environment import Env1
 
 import matplotlib.pyplot as plt
 
-os.environ['ROS_MASTER_URI'] = "http://localhost:11362" + '/'
+os.environ['ROS_MASTER_URI'] = "http://localhost:11311" + '/'
 
-out_path = 'env_max_200_output_test_1019_2.txt'
-loss_out_path = 'env_max_200_output_loss_test_1019_2.txt'
+out_path = 'env_max_200_output_test_1019_3.txt'
+loss_out_path = 'env_max_200_output_loss_test_1019_3.txt'
 is_training = True
 
 continue_execution = False
@@ -44,14 +44,14 @@ if __name__ == '__main__':
     path = '/tmp/'
     # plotter = liveplot.LivePlot(outdir)
 
-    env1 = Env1(is_training, "11362")
+    env1 = Env1(is_training, "11311")
 
     if not continue_execution:
         #Each time we take a sample and update our weights it is called a mini-batch.
         #Each time we run through the entire dataset, it's called an epoch.
         #PARAMETER LIST
         epochs = 3000000
-        steps = 150
+        steps = 300
         updateTargetNetwork = 10000
         explorationRate = 1
         minibatch_size = 64
@@ -59,11 +59,11 @@ if __name__ == '__main__':
         learningRate = 0.00025
         discountFactor = 0.99
         memorySize = 1000000
-        network_inputs = 7
+        network_inputs = 5
         network_outputs = 8
 
         ### number of hiddenLayer ###
-        network_structure = [56,28]
+        network_structure = [40,20]
         current_epoch = 0
 
         deepQ = deepq.DeepQ(network_inputs, network_outputs, memorySize, discountFactor, learningRate, learnStart)
@@ -115,7 +115,7 @@ if __name__ == '__main__':
         loss_sum = 0.0
 
         # run until env returns done
-        for i in range(150):
+        for i in range(300):
 
             qValues1 = deepQ.getQValues(observation1)
             action1 = deepQ.selectAction(qValues1, explorationRate)
@@ -139,11 +139,11 @@ if __name__ == '__main__':
 
             episode_step = i + 1
 
-            if reward1 == 150:
+            if reward1 == 300:
                 service_count1 += 1
                 done1 = True
 
-            if done1 or episode_step == 150:
+            if done1 or episode_step == 300:
                 done1 = True
                 last100Scores[last100ScoresIndex] = episode_step
                 last100ScoresIndex += 1

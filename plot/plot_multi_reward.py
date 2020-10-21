@@ -1,7 +1,7 @@
 #!/usr/bin/python
 import matplotlib.pyplot as plt
 
-path = 'env_max_200_output_test_1019_2.txt'
+path = 'env_max_200_output_test_1019_3.txt'
 isServiceCount = True
 
 if __name__ == '__main__':
@@ -14,7 +14,7 @@ if __name__ == '__main__':
     average_yp = []
     average_yp2 = []
 
-    ave_num = 10
+    ave_num = 200
 
     flag = 0
     sum1 = 0
@@ -53,8 +53,10 @@ if __name__ == '__main__':
                 flag += 1
             count += 1
 
-        plt.plot(xp,yp, color="#a9ceec", alpha=0.5)
+        # plt.plot(xp,yp, color="#a9ceec", alpha=0.5, label="reward per episode")
+        # plt.plot(average_xp,average_yp, color="#00529a", label="average reward over the 10 last episodes")
         plt.plot(average_xp,average_yp, color="#00529a")
+        # plt.legend( loc='upper left', borderaxespad=1)
         plt.draw()
-        fig.savefig("result_multi_reward.png")
+        fig.savefig("result_multi_reward" + str(ave_num) + ".png")
         plt.pause(0)

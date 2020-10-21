@@ -42,8 +42,7 @@ class Env1():
         self.reset_proxy = rospy.ServiceProxy('gazebo/reset_world', Empty)
         self.unpause_proxy = rospy.ServiceProxy('gazebo/unpause_physics', Empty)
         self.pause_proxy = rospy.ServiceProxy('gazebo/pause_physics', Empty)
-        self.goal = rospy.ServiceProxy('/gazebo/spawn_sdf_model', SpawnModel)
-        self.del_model = rospy.ServiceProxy('/gazebo/delete_model', DeleteModel)
+
         self.pan_pub = rospy.Publisher('/ubiquitous_display/pan_controller/command', Float64, queue_size=10)
         self.tilt_pub = rospy.Publisher('/ubiquitous_display/tilt_controller/command', Float64, queue_size=10)
         self.image_pub = rospy.Publisher('/ubiquitous_display/image', Int32, queue_size=10)
@@ -58,8 +57,6 @@ class Env1():
         self.ud_x = 0.
         self.diff_distance = 0.
         self.diff_angle = 0.
-
-        self.ud_spawn = rospy.ServiceProxy('/gazebo/set_model_state', SetModelState)
 
         if is_training:
             self.threshold_arrive = 0.25
@@ -116,11 +113,10 @@ class Env1():
             reach = True
         return diff, reach
 
-    def getState(self, scan):
-        scan_range = []
+    def getState(self):
         yaw = self.yaw
         min_range = 0.8
-        done = False
+
         arrive = False
 
         rel_dis_x = round(self.goal_projector_position.position.x - self.position.position.x, 1)
@@ -154,12 +150,6 @@ class Env1():
         else:
             diff_angle = round(360 - diff_angle, 2)
 
-        scan_range.append(scan.ranges[0])
-        scan_range.append(scan.ranges[540])
-
-        if min_range > min(scan_range) > 0:
-            done = True
-
         # current_distance = math.hypot(self.goal_projector_position.position.x- self.position.position.x, self.goal_projector_position.position.y - self.position.position.y)
         if diff_distance >= self.min_threshold_arrive and diff_distance <= self.max_threshold_arrive:
             # done = True
@@ -167,20 +157,18 @@ class Env1():
 
         # print "diff_distance: ", diff_distance, ", diff_angle: ", diff_angle
 
-        return scan_range, diff_distance, yaw, diff_angle, diff_distance, done, arrive
+        return yaw, diff_angle, diff_distance, arrive
 
-    def setReward(self, done, arrive):
+    def setReward(self, arrive):
+
+        done = False
 
         _, reach = self.getProjState()
 
         reward = -1
 
-        if done:
-            reward = -200
-            self.pub_cmd_vel.publish(Twist())
-
-        if reach:
-            reward = 150
+        if reach and round(self.v) == 0.0:
+            reward = 300
             done = True
 
         return reward, arrive, reach, done
@@ -192,16 +180,24 @@ class Env1():
             self.unpause_proxy()
         except (rospy.ServiceException) as e:
             print ("/gazebo/unpause_physics service call failed")
+        start = time.time()
 
         vel_cmd = Twist()
+
         if action == 0:
             self.pub_cmd_vel.publish(vel_cmd)
         elif action == 1:
-            vel_cmd.linear.x = 0.1
-            self.pub_cmd_vel.publish(vel_cmd)
+            if self.position.position.x > -4.0:
+                vel_cmd.linear.x = 0.1
+                self.pub_cmd_vel.publish(vel_cmd)
+            else:
+                self.pub_cmd_vel.publish(vel_cmd)
         elif action == 2:
-            vel_cmd.linear.x = -0.1
-            self.pub_cmd_vel.publish(vel_cmd)
+            if self.position.position.x < 4.0:
+                vel_cmd.linear.x = -0.1
+                self.pub_cmd_vel.publish(vel_cmd)
+            else:
+                self.pub_cmd_vel.publish(vel_cmd)
         elif action == 3:
             self.pan_ang = self.constrain(self.pan_ang + PAN_STEP, -PAN_LIMIT, PAN_LIMIT)
             self.pan_pub.publish(self.pan_ang)
@@ -221,12 +217,8 @@ class Env1():
 
         time.sleep(0.2)
 
-        data = None
-        while data is None:
-            try:
-                data = rospy.wait_for_message('/scan_filtered', LaserScan, timeout=5)
-            except:
-                pass
+        t = time.time() - start
+        print t
 
         rospy.wait_for_service('/gazebo/pause_physics')
         try:
@@ -235,18 +227,19 @@ class Env1():
         except (rospy.ServiceException) as e:
             print ("/gazebo/pause_physics service call failed")
 
-        state, rel_dis, yaw, diff_angle, diff_distance, done, arrive = self.getState(data)
-        state = [i / 25. for i in state]
+        yaw, diff_angle, diff_distance, arrive = self.getState()
+        state = []
+
+        state.append(diff_angle / 180)
+        state.append(self.constrain(diff_distance / diagonal_dis, -1.0, 1.0))
 
         state.append(self.constrain(self.pan_ang / PAN_LIMIT, -1.0, 1.0))
         state.append(self.constrain(self.tilt_ang / TILT_MAX_LIMIT, -1.0, 1.0))
         state.append(self.constrain(self.v, -1.0, 1.0))
 
-        state.append(diff_angle / 180)
-        state.append(self.constrain(diff_distance / diagonal_dis, -1.0, 1.0))
         # print state
         # state = state + [yaw / 360, rel_theta / 360, diff_angle / 180]
-        reward, arrive, reach, done = self.setReward(done, arrive)
+        reward, arrive, reach, done = self.setReward(arrive)
 
         return np.asarray(state), reward, done, reach, arrive
 
@@ -270,13 +263,6 @@ class Env1():
 
     def reset(self):
 
-        # Reset the env #
-        rospy.wait_for_service('/gazebo/delete_model')
-        try:
-            self.del_model('actor0')
-        except rospy.ServiceException, e:
-            print ("Service call failed: %s" % e)
-
         rospy.wait_for_service('gazebo/reset_simulation')
         try:
             self.reset_proxy()
@@ -297,39 +283,7 @@ class Env1():
         self.tilt_pub.publish(self.tilt_ang)
         self.pub_cmd_vel.publish(Twist())
 
-        human = False
-        while not human:
-            rospy.wait_for_service('/gazebo/delete_model')
-            try:
-                self.del_model('actor0')
-            except rospy.ServiceException, e:
-                print ("Service call failed: %s" % e)
-
-            rospy.wait_for_service('/gazebo/spawn_sdf_model')
-            try:
-                goal_urdf = open(goal_model_dir, "r").read()
-                target = SpawnModel
-                target.model_name = 'actor0'  # the same with sdf name
-                target.model_xml = goal_urdf
-                self.goal_position.position.x, self.goal_position.position.y, self.goal_projector_position.position.x, self.goal_projector_position.position.y, self.goal_position.orientation = self.cal_actor_pose(2.5)
-                self.goal(target.model_name, target.model_xml, 'namespace', self.goal_position, 'world')
-            except (rospy.ServiceException) as e:
-                print("/gazebo/failed to build the target")
-
-            data = None
-            while data is None:
-                try:
-                    data = rospy.wait_for_message('/scan_filtered', LaserScan, timeout=5)
-                except:
-                    pass
-            human = self.find_human(data)
-
-        data = None
-        while data is None:
-            try:
-                data = rospy.wait_for_message('/scan_filtered', LaserScan, timeout=5)
-            except:
-                pass
+        self.goal_position.position.x, self.goal_position.position.y, self.goal_projector_position.position.x, self.goal_projector_position.position.y, self.goal_position.orientation = self.cal_actor_pose(2.5)
 
         rospy.wait_for_service('/gazebo/pause_physics')
         try:
@@ -338,37 +292,13 @@ class Env1():
         except (rospy.ServiceException) as e:
             print ("/gazebo/pause_physics service call failed")
 
-        state, rel_dis, yaw, diff_angle, diff_distance, done, arrive = self.getState(data)
-        state = [i / 25. for i in state]
+        yaw, diff_angle, diff_distance, arrive = self.getState()
+        state = []
+        state.append(diff_angle / 180)
+        state.append(self.constrain(diff_distance / diagonal_dis, -1.0, 1.0))
 
         state.append(0.0)
         state.append(TILT_MIN_LIMIT / TILT_MAX_LIMIT)
         state.append(self.constrain(self.v, -1.0, 1.0))
 
-        state.append(diff_angle / 180)
-        state.append(self.constrain(diff_distance / diagonal_dis, -1.0, 1.0))
-
-        # state = state + [yaw / 360, rel_theta / 360, diff_angle / 180]
-
         return np.asarray(state)
-
-    def find_human(self, data):
-        step = math.pi / len(data.ranges)
-        human_count = 0
-        tf_count = 0
-        Human = False
-        for count in range(3):
-            for i, item in enumerate(data.ranges):
-                distance = data.ranges[i]
-                x = distance * math.cos(step * (i+1)) + self.ud_x
-                y = distance * math.sin(step * (i+1))
-                if x < 3.4 and x > -3.4 and y < 5.4 and y > 2.6:
-                    human_count += 1
-            if human_count > 7:
-                tf_count += 1
-        if tf_count >= 2:
-            Human = True
-        else:
-            print ("no human", tf_count, human_count)
-
-        return Human
