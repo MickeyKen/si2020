@@ -3,7 +3,11 @@
   <node pkg="si2020" type="new_agent.py" name="agent_pararell_2" args="11351 1.0" output="screen" />
   <!-- <node pkg="si2020" type="pararell_agent.py" name="agent_pararell_3" args="11360 1.0" output="screen" /> -->
 
+<<<<<<< HEAD
   <!-- <node pkg="si2020" type="slave_dqn.py" name="slave_dqn" output="screen"/> -->
 
   <node pkg="si2020" type="slave_dqn.py" name="slave_dqn"/>
+=======
+  <node pkg="si2020" type="new_slave_dqn.py" name="slave_dqn" output="screen"/>
+>>>>>>> develop
 </launch>

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 import matplotlib.pyplot as plt
 
-path = 'output.txt'
+path = 'env_max_200_output_test_1019_2.txt'
 isServiceCount = True
 
 if __name__ == '__main__':
@@ -34,8 +34,6 @@ if __name__ == '__main__':
     with open(path) as f:
         xp.append(0)
         yp.append(0)
-        average_xp.append(0)
-        average_yp.append(0)
         for s_line in f:
             agent = s_line.split(',')[2]
             # print(int(moji.split('.')[0]))
@@ -58,5 +56,5 @@ if __name__ == '__main__':
         plt.plot(xp,yp, color="#a9ceec", alpha=0.5)
         plt.plot(average_xp,average_yp, color="#00529a")
         plt.draw()
-        fig.savefig("result_multi_reward_1.png")
+        fig.savefig("result_multi_reward.png")
         plt.pause(0)

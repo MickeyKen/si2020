@@ -1,7 +1,7 @@
 #!/usr/bin/python
 import matplotlib.pyplot as plt
 
-path = 'output_loss.txt'
+path = 'env_max_200_output_loss_test_1019_2.txt'
 isServiceCount = False
 
 if __name__ == '__main__':

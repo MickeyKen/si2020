@@ -9,6 +9,10 @@ from numpy import inf
 # from distutils.dir_util import copy_tree
 import os
 import json
+<<<<<<< HEAD
+=======
+# import liveplot
+>>>>>>> develop
 
 import rospy
 
@@ -17,6 +21,11 @@ from new_environment import Env1
 
 from si2020_msgs.srv import *
 from si2020_msgs.msg import Experiment
+<<<<<<< HEAD
+=======
+
+import ros_np_multiarray as rnm
+>>>>>>> develop
 
 out_path = 'output.txt'
 loss_out_path = 'output_loss.txt'
@@ -26,18 +35,28 @@ continue_execution = False
 weight_file = "700.h5"
 params_json  = '700.json'
 
-os.environ['ROS_MASTER_URI'] = "http://localhost:11311" + '/'
+# os.environ['ROS_MASTER_URI'] = "http://localhost:11311" + '/'
 
 if __name__ == '__main__':
+<<<<<<< HEAD
     rospy.init_node('train_frame')
 
     call_predict = rospy.ServiceProxy('/dqn/predict', PredictCommand)
     experience_pub = rospy.Publisher('/dqn/experience', Experiment, queue_size=10)
+=======
+    rospy.sleep(4)
+>>>>>>> develop
 
     args = sys.argv
     ROS_MASTER_URI = args[1]
     explorationRate = float(args[2])
     print (str(ROS_MASTER_URI) + " , " + str(explorationRate))
+
+    os.environ['ROS_MASTER_URI'] = "http://localhost:" + str(ROS_MASTER_URI) + '/'
+    rospy.init_node('train_frame')
+
+    call_predict = rospy.ServiceProxy('/dqn/predict', PredictCommand)
+    experience_pub = rospy.Publisher('/dqn/experience', Experiment, queue_size=10)
 
     env = Env1(is_training, ROS_MASTER_URI)
     print "declare environment"
@@ -52,6 +71,9 @@ if __name__ == '__main__':
     highest_reward = 0
 
     start_time = time.time()
+    current_epoch = 0
+    epochs = 3000000
+
 
     xx = []
     y = []
@@ -60,7 +82,12 @@ if __name__ == '__main__':
     #start iterating from 'current epoch'.
     for epoch in xrange(current_epoch+1, epochs+1, 1):
         observation = env.reset()
+<<<<<<< HEAD
         print "reset"
+=======
+        observation = rnm.to_multiarray_f64(observation)
+        print type(observation)
+>>>>>>> develop
         cumulated_reward = 0
         done = False
         episode_step = 0
@@ -72,8 +99,9 @@ if __name__ == '__main__':
         for i in range(200):
 
             req = PredictCommandRequest()
-            req.observation.data = observation
-            req.explorationRate = explorationRate
+            req.observation = observation
+            req.explorationRate.data = explorationRate
+            print "calling ..."
             predict = call_predict(req)
             print ("request" + str(ROS_MASTER_URI))
             action = predict.action.data
@@ -86,13 +114,16 @@ if __name__ == '__main__':
             if highest_reward < cumulated_reward:
                 highest_reward = cumulated_reward
 
+            newObservation = rnm.to_multiarray_f64(newObservation)
+
             msg = Experiment()
-            msg.observation.data = observation
+            msg.observation = observation
             msg.action.data = action
             msg.reward.data = reward
-            msg.newObservation.data = newObservation
+            msg.newObservation = newObservation
             msg.done.data = done
             experience_pub.publish(msg)
+            print "publish experience"
 
             observation = newObservation
 
