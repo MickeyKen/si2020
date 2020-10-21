@@ -22,7 +22,7 @@ goal_model_dir = os.path.join(os.path.split(os.path.realpath(__file__))[0], '..'
                                 , 'models', 'person_standing', 'model.sdf')
 
 PAN_LIMIT = math.radians(90)  #2.9670
-TILT_MIN_LIMIT = math.radians(90) - math.atan(4.0/0.998)
+TILT_MIN_LIMIT = math.radians(90) - math.atan(3.0/0.998)
 TILT_MAX_LIMIT = math.radians(90) - math.atan(1.0/0.998)
 
 PAN_STEP = math.radians(15)

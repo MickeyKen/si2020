@@ -20,8 +20,8 @@ import matplotlib.pyplot as plt
 
 os.environ['ROS_MASTER_URI'] = "http://localhost:11362" + '/'
 
-out_path = 'env_max_200_output_test_1019_2.txt'
-loss_out_path = 'env_max_200_output_loss_test_1019_2.txt'
+out_path = 'env_max_200_output_test_1020_1.txt'
+loss_out_path = 'env_max_200_output_loss_test_1020_1.txt'
 is_training = True
 
 continue_execution = False
