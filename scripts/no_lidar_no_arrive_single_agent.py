@@ -18,10 +18,10 @@ from no_lidar_no_arrive_environment import Env1
 
 import matplotlib.pyplot as plt
 
-os.environ['ROS_MASTER_URI'] = "http://localhost:11362" + '/'
+os.environ['ROS_MASTER_URI'] = "http://localhost:11311" + '/'
 
-out_path = 'env_max_200_output_test_1020_1.txt'
-loss_out_path = 'env_max_200_output_loss_test_1020_1.txt'
+out_path = 'env_max_200_output_test_1207_1.txt'
+loss_out_path = 'env_max_200_output_loss_test_1207_1.txt'
 is_training = True
 
 continue_execution = False
@@ -44,7 +44,7 @@ if __name__ == '__main__':
     path = '/tmp/'
     # plotter = liveplot.LivePlot(outdir)
 
-    env1 = Env1(is_training, "11362")
+    env1 = Env1(is_training, "11311")
 
     if not continue_execution:
         #Each time we take a sample and update our weights it is called a mini-batch.
@@ -174,8 +174,10 @@ if __name__ == '__main__':
 
         # plot(xx,y,xx,y2,cumulated_reward)
 
+        st = time.time()
+
         filehandle = open(out_path, 'a+')
-        filehandle.write(str(epoch) + ',' + str(episode_step) + ',' + str(cumulated_reward1)+ ',' + str(steps) +  ',' + str(service_count1) + "\n")
+        filehandle.write(str(epoch) + ',' + str(episode_step) + ',' + str(cumulated_reward1)+ ',' + str(steps) +  ',' + str(service_count1) + ',' + str(st) + "\n")
         filehandle.close()
         filehandle = open(loss_out_path, 'a+')
         filehandle.write(str(epoch) + ',' + str(loss_sum/float(episode_step)) + "\n")

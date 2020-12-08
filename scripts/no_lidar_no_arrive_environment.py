@@ -58,6 +58,7 @@ class Env1():
         self.ud_x = 0.
         self.diff_distance = 0.
         self.diff_angle = 0.
+        self.action = 0
 
         self.ud_spawn = rospy.ServiceProxy('/gazebo/set_model_state', SetModelState)
 
@@ -179,7 +180,7 @@ class Env1():
             reward = -200
             self.pub_cmd_vel.publish(Twist())
 
-        if reach:
+        if reach and arrive and round(self.v, 1) == 0.0:
             reward = 150
             done = True
 
@@ -192,6 +193,8 @@ class Env1():
             self.unpause_proxy()
         except (rospy.ServiceException) as e:
             print ("/gazebo/unpause_physics service call failed")
+
+        self.action = action
 
         vel_cmd = Twist()
         if action == 0:
@@ -296,6 +299,8 @@ class Env1():
         self.pan_pub.publish(self.pan_ang)
         self.tilt_pub.publish(self.tilt_ang)
         self.pub_cmd_vel.publish(Twist())
+
+        self.action = 0
 
         human = False
         while not human:
