@@ -14,16 +14,15 @@ import deepq
 
 import rospy
 
-from no_lidar_no_arrive_environment import Env1
+from no_lidar_environment import Env1
 
 
 
 out_path = 'leaned_model_testing_output.txt'
 is_training = False
 
-continue_execution = True
-weight_file = "3200.h5"
-params_json  = '3200.json'
+weight_file = "2350.h5"
+params_json  = '2350.json'
 
 
 if __name__ == '__main__':
@@ -36,51 +35,28 @@ if __name__ == '__main__':
 
     env1 = Env1(is_training, ROS_MASTER_URI)
 
-    if not continue_execution:
-        #Each time we take a sample and update our weights it is called a mini-batch.
-        #Each time we run through the entire dataset, it's called an epoch.
-        #PARAMETER LIST
-        epochs = 3000000
-        steps = 150
-        updateTargetNetwork = 10000
-        explorationRate = 1
-        minibatch_size = 64
-        learnStart = 64
-        learningRate = 0.00025
-        discountFactor = 0.99
-        memorySize = 1000000
-        network_inputs = 7
-        network_outputs = 8
+    #Load weights, monitor info and parameter info.
+    #ADD TRY CATCH fro this else
+    with open(params_json) as outfile:
+        d = json.load(outfile)
+        epochs = d.get('epochs')
+        steps = d.get('steps')
+        updateTargetNetwork = d.get('updateTargetNetwork')
+        explorationRate = 0.0
+        minibatch_size = d.get('minibatch_size')
+        learnStart = d.get('learnStart')
+        learningRate = d.get('learningRate')
+        discountFactor = d.get('discountFactor')
+        memorySize = d.get('memorySize')
+        network_inputs = d.get('network_inputs')
+        network_outputs = d.get('network_outputs')
+        network_structure = d.get('network_structure')
+        current_epoch = d.get('current_epoch')
 
-        ### number of hiddenLayer ###
-        network_structure = [56,28]
-        current_epoch = 0
-
-        deepQ = deepq.DeepQ(network_inputs, network_outputs, memorySize, discountFactor, learningRate, learnStart)
-        deepQ.initNetworks(network_structure)
-    else:
-        #Load weights, monitor info and parameter info.
-        #ADD TRY CATCH fro this else
-        with open(params_json) as outfile:
-            d = json.load(outfile)
-            epochs = d.get('epochs')
-            steps = d.get('steps')
-            updateTargetNetwork = d.get('updateTargetNetwork')
-            explorationRate = d.get('explorationRate')
-            minibatch_size = d.get('minibatch_size')
-            learnStart = d.get('learnStart')
-            learningRate = d.get('learningRate')
-            discountFactor = d.get('discountFactor')
-            memorySize = d.get('memorySize')
-            network_inputs = d.get('network_inputs')
-            network_outputs = d.get('network_outputs')
-            network_structure = d.get('network_structure')
-            current_epoch = d.get('current_epoch')
-
-        deepQ = deepq.DeepQ(network_inputs, network_outputs, memorySize, discountFactor, learningRate, learnStart)
-        deepQ.initNetworks(network_structure)
-        print ("    ***** load file "+ weight_file+" *****")
-        deepQ.loadWeights(weight_file)
+    deepQ = deepq.DeepQ(network_inputs, network_outputs, memorySize, discountFactor, learningRate, learnStart)
+    deepQ.initNetworks(network_structure)
+    print ("    ***** load file "+ weight_file+" *****")
+    deepQ.loadWeights(weight_file)
 
     last100Scores = [0] * 100
     last100ScoresIndex = 0
@@ -142,6 +118,6 @@ if __name__ == '__main__':
         filehandle.write(str(epoch) + ',' + str(episode_step) + ',' + str(cumulated_reward1)+ ',' + str(steps) +  ',' + str(service_count1) + "\n")
         filehandle.close()
 
-        explorationRate *= 0.995 #epsilon decay
-        # explorationRate -= (2.0/epochs)
-        explorationRate = max (0.05, explorationRate)
+        # explorationRate *= 0.995 #epsilon decay
+        # # explorationRate -= (2.0/epochs)
+        # explorationRate = max (0.05, explorationRate)
