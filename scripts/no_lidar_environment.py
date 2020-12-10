@@ -183,6 +183,14 @@ class Env1():
             reward = 150
             done = True
 
+        else:
+            if arrive:
+                reward += 0.4
+            if reach:
+                reward += 0.4
+            if round(self.v, 1) == 0.0:
+                reward += 0.2
+
         return reward, arrive, reach, done
 
 
