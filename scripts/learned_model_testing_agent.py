@@ -15,7 +15,7 @@ import deepq
 import rospy
 
 from no_lidar_environment import Env1
-
+import matplotlib.pyplot as plt
 
 
 out_path = 'leaned_model_testing_output.txt'
@@ -70,6 +70,9 @@ if __name__ == '__main__':
     y = []
     y2 = []
 
+    qV = []
+    labels = ["No operation", "Stop","Move forward", "Move Backword", "Rotate pan joint clockwise", "Rotate pan joint counterclockwise", "Rotate tilt joint clockwise", "Rotate tilt joint counterclockwise"]
+
     #start iterating from 'current epoch'.
     for epoch in xrange(current_epoch+1, epochs+1, 1):
         observation1 = env1.reset()
@@ -78,12 +81,27 @@ if __name__ == '__main__':
         episode_step = 0
         last_action1 = 0
         service_count1 = 0
+        qV = np.empty(0)
 
         # run until env returns done
         for i in range(150):
 
+            plt.clf()
+
             qValues1 = deepQ.getQValues(observation1)
+            qV = np.empty(0)
+            for i in range(len(qValues1)):
+                # qV.append(qValues1[i])
+                qV = np.append(qV, qValues1[i])
+            # print qV
             action1 = deepQ.selectAction(qValues1, explorationRate)
+            # print action1
+            plt.bar(range(8), qV, tick_label = labels, width=0.5, color="lightgray")
+            plt.xticks(rotation=45)
+            plt.title("Selected action: " + labels[action1])
+            plt.draw()
+            # fig.savefig("result_multi_reward.png")
+            plt.pause(1)
             newObservation1, reward1, done1, arrive1, reach1  = env1.step(action1, last_action1)
             last_action1 = action1
             cumulated_reward1 += reward1
@@ -108,7 +126,6 @@ if __name__ == '__main__':
                     parameter_values = [epochs, steps, updateTargetNetwork, explorationRate, minibatch_size, learnStart, learningRate, discountFactor, memorySize, network_inputs, network_outputs, network_structure, epoch]
                     parameter_dictionary = dict(zip(parameter_keys, parameter_values))
                 break
-
 
             stepCounter += 1
 
