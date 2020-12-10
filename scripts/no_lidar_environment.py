@@ -264,7 +264,7 @@ class Env1():
         rxp = 0.
         ryp = 0.
         rq = Quaternion()
-        xp = random.uniform(-3.0, 3.0)
+        xp = random.uniform(-2.8, 2.8)
         yp = random.uniform(3.0, 5.0)
         ang = 0
         rxp = xp + (distance * math.sin(math.radians(ang)))
