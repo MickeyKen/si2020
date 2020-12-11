@@ -20,14 +20,18 @@ from gazebo_msgs.srv import SetModelState, SetModelStateRequest
 diagonal_dis = 6.68
 goal_model_dir = os.path.join(os.path.split(os.path.realpath(__file__))[0], '..'
                                 , 'models', 'person_standing', 'model.sdf')
+EYE_AREA = 45 #degree
 
 PAN_LIMIT = math.radians(90)  #2.9670
 TILT_MIN_LIMIT = math.radians(90) - math.atan(3.0/0.998)
 TILT_MAX_LIMIT = math.radians(90) - math.atan(1.5/0.998)
+VEL_LIMIT = 0.65
 
 PAN_STEP = math.radians(15)
 TILT_STEP = math.radians(3)
+VEL_STEP = 0.05
 
+INTIMATE_SPACE = 0.5
 class Env1():
     def __init__(self, is_training, ROS_MASTER_URI):
         os.environ['ROS_MASTER_URI'] = "http://localhost:" + str(ROS_MASTER_URI) + '/'
@@ -54,6 +58,8 @@ class Env1():
         self.yaw = 0
         self.pan_ang = 0.
         self.tilt_ang = 0.
+        self.vx = 0.
+        self.vy = 0.
         self.v = 0.
         self.ud_x = 0.
         self.diff_distance = 0.
@@ -116,7 +122,7 @@ class Env1():
             reach = True
         return diff, reach
 
-    def getState(self, scan):
+    def getState(self, fscan,rscan):
         scan_range = []
         yaw = self.yaw
         min_range = 0.8
@@ -126,6 +132,9 @@ class Env1():
         rel_dis_x = round(self.goal_projector_position.position.x - self.position.position.x, 1)
         rel_dis_y = round(self.goal_projector_position.position.y - self.position.position.y, 1)
         diff_distance = math.hypot(rel_dis_x, rel_dis_y)
+        rel_dis_hu_x = round(self.goal_position.position.x - self.position.position.x, 1)
+        rel_dis_hu_y = round(self.goal_position.position.y - self.position.position.y, 1)
+        diff_hu_distance = math.hypot(rel_dis_hu_x, rel_dis_hu_y)
 
         if rel_dis_x > 0 and rel_dis_y > 0:
             theta = math.atan(rel_dis_y / rel_dis_x)
@@ -144,30 +153,71 @@ class Env1():
         else:
             theta = math.pi
 
+
+        if rel_dis_hu_x > 0 and rel_dis_hu_y > 0:
+            theta2 = math.atan(rel_dis_hu_y / rel_dis_hu_x)
+            h_theta = (1.0 / 2.0 * math.pi) - theta2 + math.radians(self.human_yaw)
+        elif rel_dis_hu_x > 0 and rel_dis_hu_y < 0:
+            theta2 = 2.0 * math.pi + math.atan(rel_dis_hu_y / rel_dis_hu_x)
+            h_theta = math.radians(450) - theta2 + math.radians(self.human_yaw)
+        elif rel_dis_hu_x < 0 and rel_dis_hu_y < 0:
+            theta2 = math.pi + abs(math.atan(rel_dis_hu_y / rel_dis_hu_x))
+            h_theta = theta2 - (1.0 / 2.0 * math.pi) - math.radians(self.human_yaw)
+        elif rel_dis_hu_x < 0 and rel_dis_hu_y > 0:
+            theta2 = math.pi + math.atan(rel_dis_hu_y / rel_dis_hu_x)
+            h_theta = theta2 - (1.0 / 2.0 * math.pi) - math.radians(self.human_yaw)
+        elif rel_dis_hu_x == 0 and rel_dis_hu_y > 0:
+            theta2 = 1.0 / 2.0 * math.pi
+            h_theta = math.radians(self.human_yaw)
+        elif rel_dis_hu_x == 0 and rel_dis_hu_y < 0:
+            theta2 = 3.0 / 2.0 * math.pi
+            h_theta = math.pi - abs(math.radians(self.human_yaw))
+        elif rel_dis_hu_y == 0 and rel_dis_hu_x > 0:
+            theta2 = 0
+            h_theta = (1.0 / 2.0 * math.pi) + math.radians(self.human_yaw)
+        else:
+            theta2 = math.pi
+            h_theta = (1.0 / 2.0 * math.pi) - math.radians(self.human_yaw)
+
+
         rel_theta = round(math.degrees(theta), 2)
         diff_angle = abs(rel_theta - yaw)
 
+        rel_h_theta = round(math.degrees(h_theta), 2)
+        diff_hu_angle = abs(rel_h_theta)
         # print "rel_dis_x: ",rel_dis_x, ", rel_dis_y: ", rel_dis_y, ", rel_theta: ", rel_theta, ", diff_angle: ", diff_angle
 
-        if diff_angle <= 180:
-            diff_angle = round(diff_angle, 2)
+        if diff_hu_angle <= 180:
+            diff_hu_angle = round(diff_hu_angle, 2)
         else:
-            diff_angle = round(360 - diff_angle, 2)
+            diff_hu_angle = round(360 - diff_hu_angle, 2)
 
-        scan_range.append(scan.ranges[0])
-        scan_range.append(scan.ranges[540])
+        scan_range.append(fscan.ranges[540])
+        scan_range.append(rscan.ranges[540])
 
-        if min_range > min(scan_range) > 0:
+        ### front lidars ###
+        if fscan.ranges[900] < rscan.ranges[180]:
+            scan_range.append(fscan.ranges[900])
+        else:
+            scan_range.append(rscan.ranges[180])
+
+        ### rear lidars ###
+        if fscan.ranges[180] < rscan.ranges[900]:
+            scan_range.append(fscan.ranges[180])
+        else:
+            scan_range.append(rscan.ranges[900])
+
+        if min_range > min(scan_range) > 0 or diff_hu_distance < INTIMATE_SPACE:
             done = True
 
         # current_distance = math.hypot(self.goal_projector_position.position.x- self.position.position.x, self.goal_projector_position.position.y - self.position.position.y)
-        if diff_distance >= self.min_threshold_arrive and diff_distance <= self.max_threshold_arrive:
+        if diff_distance >= self.min_threshold_arrive and diff_distance <= self.max_threshold_arrive and diff_hu_angle < EYE_AREA:
             # done = True
             arrive = True
 
         # print "diff_distance: ", diff_distance, ", diff_angle: ", diff_angle
 
-        return scan_range, diff_distance, yaw, diff_angle, diff_distance, done, arrive
+        return scan_range, diff_distance, diff_angle, diff_hu_angle, done, arrive
 
     def setReward(self, done, arrive):
 
@@ -203,36 +253,65 @@ class Env1():
 
         vel_cmd = Twist()
         if action == 0:
-            self.pub_cmd_vel.publish(vel_cmd)
+            pass
         elif action == 1:
-            vel_cmd.linear.x = 0.1
             self.pub_cmd_vel.publish(vel_cmd)
         elif action == 2:
-            vel_cmd.linear.x = -0.1
+            self.vx = self.constrain(self.vx + VEL_STEP, -VEL_LIMIT, VEL_LIMIT)
+            self.v = math.hypot(self.vx, self.vy)
+            if not VEL_LIMIT > self.v:
+                self.vx = self.constrain(self.vx - VEL_STEP, -VEL_LIMIT, VEL_LIMIT)
+            vel_cmd.linear.x = self.vx
+            vel_cmd.linear.y = self.vy
             self.pub_cmd_vel.publish(vel_cmd)
         elif action == 3:
+            self.vx = self.constrain(self.vx - VEL_STEP, -VEL_LIMIT, VEL_LIMIT)
+            self.v = math.hypot(self.vx, self.vy)
+            vel_cmd.linear.x = self.vx
+            vel_cmd.linear.y = self.vy
+            self.pub_cmd_vel.publish(vel_cmd)
+        elif action == 4:
+            self.vy = self.constrain(self.vy + VEL_STEP, -VEL_LIMIT, VEL_LIMIT)
+            self.v = math.hypot(self.vx, self.vy)
+            if not VEL_LIMIT > self.v:
+                self.vy = self.constrain(self.vy - VEL_STEP, -VEL_LIMIT, VEL_LIMIT)
+            vel_cmd.linear.x = self.vx
+            vel_cmd.linear.y = self.vy
+            self.pub_cmd_vel.publish(vel_cmd)
+        elif action == 5:
+            self.vy = self.constrain(self.vy - VEL_STEP, -VEL_LIMIT, VEL_LIMIT)
+            self.v = math.hypot(self.vx, self.vy)
+            vel_cmd.linear.x = self.vx
+            vel_cmd.linear.y = self.vy
+            self.pub_cmd_vel.publish(vel_cmd)
+        elif action == 6:
             self.pan_ang = self.constrain(self.pan_ang + PAN_STEP, -PAN_LIMIT, PAN_LIMIT)
             self.pan_pub.publish(self.pan_ang)
-        elif action == 4:
+        elif action == 7:
             self.pan_ang = self.constrain(self.pan_ang - PAN_STEP, -PAN_LIMIT, PAN_LIMIT)
             self.pan_pub.publish(self.pan_ang)
-        elif action == 5:
+        elif action == 8:
             self.tilt_ang = self.constrain(self.tilt_ang + TILT_STEP, TILT_MIN_LIMIT, TILT_MAX_LIMIT)
             self.tilt_pub.publish(self.tilt_ang)
-        elif action == 6:
+        elif action == 9:
             self.tilt_ang = self.constrain(self.tilt_ang - TILT_STEP, TILT_MIN_LIMIT, TILT_MAX_LIMIT)
             self.tilt_pub.publish(self.tilt_ang)
-        elif action == 7:
-            pass
+
         else:
-            print ("Error action is from 0 to 6")
+            print ("Error action is from 0 to 9 (10 actions)")
 
         time.sleep(0.2)
 
-        data = None
-        while data is None:
+        front_data = None
+        while front_data is None:
             try:
-                data = rospy.wait_for_message('/scan_filtered', LaserScan, timeout=5)
+                front_data = rospy.wait_for_message('/front_laser_scan', LaserScan, timeout=5)
+            except:
+                pass
+        rear_data = None
+        while rear_data is None:
+            try:
+                rear_data = rospy.wait_for_message('/rear_laser_scan', LaserScan, timeout=5)
             except:
                 pass
 
@@ -243,17 +322,18 @@ class Env1():
         except (rospy.ServiceException) as e:
             print ("/gazebo/pause_physics service call failed")
 
-        state, rel_dis, yaw, diff_angle, diff_distance, done, arrive = self.getState(data)
+        state, rel_dis, diff_angle, diff_distance, diff_hu_angle, done, arrive = self.getState(front_data,rear_data)
         state = [i / 25. for i in state]
 
         state.append(self.constrain(self.pan_ang / PAN_LIMIT, -1.0, 1.0))
         state.append(self.constrain(self.tilt_ang / TILT_MAX_LIMIT, -1.0, 1.0))
         state.append(self.constrain(self.v, -1.0, 1.0))
 
-        state.append(diff_angle / 180)
+        state.append(diff_angle / 360)
         state.append(self.constrain(diff_distance / diagonal_dis, -1.0, 1.0))
-        # print state
-        # state = state + [yaw / 360, rel_theta / 360, diff_angle / 180]
+        state.append(diff_hu_angle / 180)
+
+        print state
         reward, arrive, reach, done = self.setReward(done, arrive)
 
         return np.asarray(state), reward, done, reach, arrive
@@ -333,10 +413,16 @@ class Env1():
                     pass
             human = self.find_human(data)
 
-        data = None
-        while data is None:
+        front_data = None
+        while front_data is None:
             try:
-                data = rospy.wait_for_message('/scan_filtered', LaserScan, timeout=5)
+                front_data = rospy.wait_for_message('/front_laser_scan', LaserScan, timeout=5)
+            except:
+                pass
+        rear_data = None
+        while rear_data is None:
+            try:
+                rear_data = rospy.wait_for_message('/rear_laser_scan', LaserScan, timeout=5)
             except:
                 pass
 
@@ -347,16 +433,16 @@ class Env1():
         except (rospy.ServiceException) as e:
             print ("/gazebo/pause_physics service call failed")
 
-        state, rel_dis, yaw, diff_angle, diff_distance, done, arrive = self.getState(data)
+        state, rel_dis, diff_angle, diff_distance, diff_hu_angle, done, arrive = self.getState(front_data,rear_data)
         state = [i / 25. for i in state]
 
         state.append(0.0)
         state.append(TILT_MIN_LIMIT / TILT_MAX_LIMIT)
         state.append(self.constrain(self.v, -1.0, 1.0))
 
-        state.append(diff_angle / 180)
+        state.append(diff_angle / 360)
         state.append(self.constrain(diff_distance / diagonal_dis, -1.0, 1.0))
-
+        state.append(diff_hu_angle / 180)
         # state = state + [yaw / 360, rel_theta / 360, diff_angle / 180]
 
         return np.asarray(state)

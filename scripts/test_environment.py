@@ -127,30 +127,51 @@ class Env1():
         rel_dis_x = round(self.goal_projector_position.position.x - self.position.position.x, 1)
         rel_dis_y = round(self.goal_projector_position.position.y - self.position.position.y, 1)
         diff_distance = math.hypot(rel_dis_x, rel_dis_y)
+        rel_dis_hu_x = round(self.goal_position.position.x - self.position.position.x, 1)
+        rel_dis_hu_y = round(self.goal_position.position.y - self.position.position.y, 1)
+        diff_hu_distance = math.hypot(rel_dis_hu_x, rel_dis_hu_y)
 
+        print ("Diff H-U distance: ",diff_hu_distance)
         if rel_dis_x > 0 and rel_dis_y > 0:
             theta = math.atan(rel_dis_y / rel_dis_x)
-            h_theta = (1.0 / 2.0 * math.pi) - theta + math.radians(self.human_yaw)
         elif rel_dis_x > 0 and rel_dis_y < 0:
             theta = 2.0 * math.pi + math.atan(rel_dis_y / rel_dis_x)
-            h_theta = math.radians(450) - theta + math.radians(self.human_yaw)
         elif rel_dis_x < 0 and rel_dis_y < 0:
             theta = math.pi + abs(math.atan(rel_dis_y / rel_dis_x))
-            h_theta = theta - (1.0 / 2.0 * math.pi) - math.radians(self.human_yaw)
         elif rel_dis_x < 0 and rel_dis_y > 0:
             theta = math.pi + math.atan(rel_dis_y / rel_dis_x)
-            h_theta = theta - (1.0 / 2.0 * math.pi) - math.radians(self.human_yaw)
         elif rel_dis_x == 0 and rel_dis_y > 0:
             theta = 1.0 / 2.0 * math.pi
-            h_theta = math.radians(self.human_yaw)
         elif rel_dis_x == 0 and rel_dis_y < 0:
             theta = 3.0 / 2.0 * math.pi
-            h_theta = math.pi - abs(math.radians(self.human_yaw))
         elif rel_dis_y == 0 and rel_dis_x > 0:
             theta = 0
-            h_theta = (1.0 / 2.0 * math.pi) + math.radians(self.human_yaw)
         else:
             theta = math.pi
+
+        if rel_dis_hu_x > 0 and rel_dis_hu_y > 0:
+            theta2 = math.atan(rel_dis_hu_y / rel_dis_hu_x)
+            h_theta = (1.0 / 2.0 * math.pi) - theta2 + math.radians(self.human_yaw)
+        elif rel_dis_hu_x > 0 and rel_dis_hu_y < 0:
+            theta2 = 2.0 * math.pi + math.atan(rel_dis_hu_y / rel_dis_hu_x)
+            h_theta = math.radians(450) - theta2 + math.radians(self.human_yaw)
+        elif rel_dis_hu_x < 0 and rel_dis_hu_y < 0:
+            theta2 = math.pi + abs(math.atan(rel_dis_hu_y / rel_dis_hu_x))
+            h_theta = theta2 - (1.0 / 2.0 * math.pi) - math.radians(self.human_yaw)
+        elif rel_dis_hu_x < 0 and rel_dis_hu_y > 0:
+            theta2 = math.pi + math.atan(rel_dis_hu_y / rel_dis_hu_x)
+            h_theta = theta2 - (1.0 / 2.0 * math.pi) - math.radians(self.human_yaw)
+        elif rel_dis_hu_x == 0 and rel_dis_hu_y > 0:
+            theta2 = 1.0 / 2.0 * math.pi
+            h_theta = math.radians(self.human_yaw)
+        elif rel_dis_hu_x == 0 and rel_dis_hu_y < 0:
+            theta2 = 3.0 / 2.0 * math.pi
+            h_theta = math.pi - abs(math.radians(self.human_yaw))
+        elif rel_dis_hu_y == 0 and rel_dis_hu_x > 0:
+            theta2 = 0
+            h_theta = (1.0 / 2.0 * math.pi) + math.radians(self.human_yaw)
+        else:
+            theta2 = math.pi
             h_theta = (1.0 / 2.0 * math.pi) - math.radians(self.human_yaw)
 
         rel_theta = round(math.degrees(theta), 2)
