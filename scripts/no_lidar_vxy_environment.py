@@ -223,8 +223,8 @@ class Env1():
             # done = True
             arrive = True
 
-        print "diff_distance: ", diff_distance, ", diff_angle: ", diff_angle, ",diff_hu_distance: ", diff_hu_distance, ", diff_hu_angle: ", diff_hu_angle
-        print scan_range
+        # print "diff_distance: ", diff_distance, ", diff_angle: ", diff_angle, ",diff_hu_distance: ", diff_hu_distance, ", diff_hu_angle: ", diff_hu_angle
+        # print scan_range
         return scan_range, diff_distance, diff_angle, diff_hu_angle, done, arrive
 
     def setReward(self, done, arrive):
@@ -247,6 +247,8 @@ class Env1():
             if reach:
                 reward += 0.4
             if round(self.v, 1) == 0.0:
+                reward -= 2.0
+            else:
                 reward += 0.2
 
         return reward, arrive, reach, done
@@ -263,6 +265,9 @@ class Env1():
         if action == 0:
             pass
         elif action == 1:
+            self.vx = 0.
+            self.vy = 0.
+            self.v = 0.
             self.pub_cmd_vel.publish(vel_cmd)
         elif action == 2:
             self.vx = self.constrain(self.vx + VEL_STEP, -VEL_LIMIT, VEL_LIMIT)
