@@ -20,7 +20,7 @@ from gazebo_msgs.srv import SetModelState, SetModelStateRequest
 
 goal_model_dir = os.path.join(os.path.split(os.path.realpath(__file__))[0], '..'
                                 , 'models', 'person_standing', 'model.sdf')
-EYE_AREA = 45 #degree
+EYE_AREA = 45.0 #degree
 
 PAN_LIMIT = math.radians(90)  #2.9670
 TILT_MIN_LIMIT = math.radians(90) - math.atan(3.0/0.998)
@@ -39,6 +39,7 @@ HUMAN_YMAX = 5.0
 HUMAN_YMIN = 1.5
 
 diagonal_dis = math.hypot(2.0*HUMAN_XMAX, HUMAN_YMAX+2.0)
+
 class Env1():
     def __init__(self, is_training, ROS_MASTER_URI):
         os.environ['ROS_MASTER_URI'] = "http://localhost:" + str(ROS_MASTER_URI) + '/'
@@ -191,6 +192,9 @@ class Env1():
         rel_theta = round(math.degrees(theta), 2)
         diff_angle = abs(rel_theta - yaw)
 
+        rel_theta2 = round(math.degrees(theta2), 2)
+        diff_angle2 = abs(rel_theta2 - yaw)
+
         rel_h_theta = round(math.degrees(h_theta), 2)
         diff_hu_angle = abs(rel_h_theta)
         # print "rel_dis_x: ",rel_dis_x, ", rel_dis_y: ", rel_dis_y, ", rel_theta: ", rel_theta, ", diff_angle: ", diff_angle
@@ -225,7 +229,7 @@ class Env1():
 
         # print "diff_distance: ", diff_distance, ", diff_angle: ", diff_angle, ",diff_hu_distance: ", diff_hu_distance, ", diff_hu_angle: ", diff_hu_angle
         # print scan_range
-        return scan_range, diff_distance, diff_angle, diff_hu_angle, done, arrive
+        return scan_range, diff_distance, diff_angle, diff_hu_distance, diff_angle2, diff_hu_angle, done, arrive
 
     def setReward(self, done, arrive):
 
@@ -335,17 +339,19 @@ class Env1():
         except (rospy.ServiceException) as e:
             print ("/gazebo/pause_physics service call failed")
 
-        state, diff_distance, diff_angle, diff_hu_angle, done, arrive = self.getState(front_data,rear_data)
+        state, diff_distance, diff_angle, diff_hu_distance, diff_angle2, diff_hu_angle, done, arrive = self.getState(front_data,rear_data)
         state = [i / 25. for i in state]
 
         state.append(self.constrain(self.pan_ang / PAN_LIMIT, -1.0, 1.0))
         state.append(self.constrain(self.tilt_ang / TILT_MAX_LIMIT, -1.0, 1.0))
         state.append(self.constrain(self.vx / VEL_LIMIT, -1.0, 1.0))
         state.append(self.constrain(self.vy / VEL_LIMIT, -1.0, 1.0))
-        
-        state.append(diff_angle / 360)
+
+        state.append(diff_angle / 360.0)
         state.append(self.constrain(diff_distance / diagonal_dis, -1.0, 1.0))
-        state.append(diff_hu_angle / 180)
+        state.append(diff_angle2 / 360.0)
+        state.append(self.constrain(diff_hu_distance / diagonal_dis, -1.0, 1.0))
+        state.append(diff_hu_angle / 180.0)
 
         # print state
         reward, arrive, reach, done = self.setReward(done, arrive)
@@ -458,7 +464,7 @@ class Env1():
         except (rospy.ServiceException) as e:
             print ("/gazebo/pause_physics service call failed")
 
-        state, diff_distance, diff_angle, diff_hu_angle, done, arrive = self.getState(front_data,rear_data)
+        state, diff_distance, diff_angle, diff_hu_distance, diff_angle2, diff_hu_angle, done, arrive = self.getState(front_data,rear_data)
         state = [i / 25. for i in state]
 
         state.append(0.0)
@@ -466,10 +472,11 @@ class Env1():
         state.append(self.constrain(self.vx / VEL_LIMIT, -1.0, 1.0))
         state.append(self.constrain(self.vy / VEL_LIMIT, -1.0, 1.0))
 
-        state.append(diff_angle / 360)
+        state.append(diff_angle / 360.0)
         state.append(self.constrain(diff_distance / diagonal_dis, -1.0, 1.0))
-        state.append(diff_hu_angle / 180)
-        # state = state + [yaw / 360, rel_theta / 360, diff_angle / 180]
+        state.append(diff_angle2 / 360.0)
+        state.append(self.constrain(diff_hu_distance / diagonal_dis, -1.0, 1.0))
+        state.append(diff_hu_angle / 180.0)
 
         return np.asarray(state)
 

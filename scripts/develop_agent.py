@@ -20,8 +20,8 @@ import matplotlib.pyplot as plt
 
 os.environ['ROS_MASTER_URI'] = "http://localhost:11311" + '/'
 
-out_path = 'env_max_200_output_test_1211_1.txt'
-loss_out_path = 'env_max_200_output_loss_test_1211_1.txt'
+out_path = 'env_max_200_output_test_1213_2.txt'
+loss_out_path = 'env_max_200_output_loss_test_1213_2.txt'
 is_training = True
 
 continue_execution = False
@@ -59,7 +59,7 @@ if __name__ == '__main__':
         learningRate = 0.00025
         discountFactor = 0.99
         memorySize = 1000000
-        network_inputs = 11
+        network_inputs = 13
         network_outputs = 10
 
         ### number of hiddenLayer ###
