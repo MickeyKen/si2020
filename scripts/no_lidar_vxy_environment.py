@@ -340,8 +340,9 @@ class Env1():
 
         state.append(self.constrain(self.pan_ang / PAN_LIMIT, -1.0, 1.0))
         state.append(self.constrain(self.tilt_ang / TILT_MAX_LIMIT, -1.0, 1.0))
-        state.append(self.constrain(self.v, -1.0, 1.0))
-
+        state.append(self.constrain(self.vx / VEL_LIMIT, -1.0, 1.0))
+        state.append(self.constrain(self.vy / VEL_LIMIT, -1.0, 1.0))
+        
         state.append(diff_angle / 360)
         state.append(self.constrain(diff_distance / diagonal_dis, -1.0, 1.0))
         state.append(diff_hu_angle / 180)
@@ -462,7 +463,8 @@ class Env1():
 
         state.append(0.0)
         state.append(TILT_MIN_LIMIT / TILT_MAX_LIMIT)
-        state.append(self.constrain(self.v, -1.0, 1.0))
+        state.append(self.constrain(self.vx / VEL_LIMIT, -1.0, 1.0))
+        state.append(self.constrain(self.vy / VEL_LIMIT, -1.0, 1.0))
 
         state.append(diff_angle / 360)
         state.append(self.constrain(diff_distance / diagonal_dis, -1.0, 1.0))

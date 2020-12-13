@@ -59,11 +59,11 @@ if __name__ == '__main__':
         learningRate = 0.00025
         discountFactor = 0.99
         memorySize = 1000000
-        network_inputs = 10
+        network_inputs = 11
         network_outputs = 10
 
         ### number of hiddenLayer ###
-        network_structure = [80,40]
+        network_structure = [112,56,28]
         current_epoch = 0
 
         deepQ = deepq.DeepQ(network_inputs, network_outputs, memorySize, discountFactor, learningRate, learnStart)
