@@ -27,7 +27,7 @@ if __name__ == '__main__':
     plt.ion()
     # plt.title('Simple Curve Graph')
     plt.xlabel('Episode')
-    plt.ylabel('Reward')
+    plt.ylabel('Serviced human count')
     # plt.xlim(0,1500)
     # plt.ylim(-500,2000)
     plt.grid()
@@ -35,7 +35,7 @@ if __name__ == '__main__':
         xp.append(0)
         yp.append(0)
         for s_line in f:
-            agent = s_line.split(',')[2]
+            agent = s_line.split(',')[4]
             # print(int(moji.split('.')[0]))
             xp.append(count + 1)
             yp.append(float(agent))
@@ -53,8 +53,8 @@ if __name__ == '__main__':
                 flag += 1
             count += 1
 
-        plt.plot(xp,yp, color="#a9ceec", alpha=0.5)
+        # plt.plot(xp,yp, color="#a9ceec", alpha=0.5)
         plt.plot(average_xp,average_yp, color="#00529a")
         plt.draw()
-        fig.savefig("reward_multi_" + str(path.split(',')[0]) + ".png")
+        fig.savefig("result_multi_serviced_count_" + str(path.split(',')[0]) + ".png")
         plt.pause(0)

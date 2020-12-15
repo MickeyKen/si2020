@@ -1,7 +1,7 @@
 #!/usr/bin/python
 import matplotlib.pyplot as plt
 
-path = 'env_max_200_output_loss_test_1019_2.txt'
+path = 'env_max_200_output_loss_test_1213_2.txt'
 isServiceCount = False
 
 if __name__ == '__main__':
@@ -36,5 +36,5 @@ if __name__ == '__main__':
         plt.plot(xp,yp)
         # plt.plot(average_xp,average_yp, color="#00529a")
         plt.draw()
-        fig.savefig("loss_multi.png")
+        fig.savefig("loss_multi_" + str(path.split(',')[0]) + ".png")
         plt.pause(0)
