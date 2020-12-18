@@ -17,6 +17,7 @@ from gazebo_msgs.srv import SpawnModel, DeleteModel
 from gazebo_msgs.msg import ModelStates
 from gazebo_msgs.srv import SetModelState, SetModelStateRequest
 
+out_path = 'environment_output_test_1216_2.txt'
 
 goal_model_dir = os.path.join(os.path.split(os.path.realpath(__file__))[0], '..'
                                 , 'models', 'person_standing', 'model.sdf')
@@ -131,6 +132,7 @@ class Env1():
         return diff, reach
 
     def getState(self, fscan,rscan):
+        scan_ranges = []
         scan_range = []
         yaw = self.yaw
         min_range = 0.8
@@ -204,20 +206,21 @@ class Env1():
         else:
             diff_hu_angle = round(360 - diff_hu_angle, 2)
 
-        scan_range.append(fscan.ranges[540])
-        scan_range.append(rscan.ranges[540])
+        for i in range(len(fscan.ranges)):
+            if fscan.ranges[i] == float('Inf'):
+                scan_ranges.append(25.0)
+            elif np.isnan(fscan.ranges[i]):
+                scan_ranges.append(0)
+            else:
+                scan_ranges.append(fscan.ranges[i])
+        scan_range.append(min(scan_ranges[0:215]))
+        scan_range.append(min(scan_ranges[216:431]))
+        scan_range.append(min(scan_ranges[432:647]))
+        scan_range.append(min(scan_ranges[648:863]))
+        scan_range.append(min(scan_ranges[864:1079]))
 
-        ### front lidars ###
-        if fscan.ranges[900] < rscan.ranges[180]:
-            scan_range.append(fscan.ranges[900])
-        else:
-            scan_range.append(rscan.ranges[180])
-
-        ### rear lidars ###
-        if fscan.ranges[180] < rscan.ranges[900]:
-            scan_range.append(fscan.ranges[180])
-        else:
-            scan_range.append(rscan.ranges[900])
+        if min_range > min(scan_range) > 0:
+            done = True
 
         if min_range > min(scan_range) > 0 or diff_hu_distance < INTIMATE_SPACE:
             done = True
@@ -240,20 +243,33 @@ class Env1():
         if done:
             reward = -200
             self.pub_cmd_vel.publish(Twist())
+            filehandle = open(out_path, 'a+')
+            filehandle.write("done" + ',' + str(self.goal_projector_position.position.x)+ ',' + str(self.goal_projector_position.position.y) +  ',' + str(self.goal_position.position.x) + ',' + str(self.goal_position.position.y) + "\n")
+            filehandle.close()
 
-        if arrive and reach and round(self.v, 1) == 0.0:
+        if arrive and round(self.v, 1) == 0.0:
             reward = 150
             done = True
+            filehandle = open(out_path, 'a+')
+            filehandle.write("arrive" + ',' + str(self.goal_projector_position.position.x)+ ',' + str(self.goal_projector_position.position.y) +  ',' + str(self.goal_position.position.x) + ',' + str(self.goal_position.position.y) + "\n")
+            filehandle.close()
 
-        else:
-            if arrive:
-                reward += 0.4
-            if reach:
-                reward += 0.4
-            if round(self.v, 1) == 0.0:
-                reward -= 2.0
-            else:
-                reward += 0.2
+        # else:
+        #     if arrive:
+        #         reward += 0.4
+        #
+        #         if round(self.v, 1) == 0.0:
+        #             reward += 0.2
+        #         else:
+        #             reward -= 2.0
+        #     else:
+        #         if round(self.v, 1) == 0.0:
+        #             reward -= 2.0
+        #         else:
+        #             reward += 0.2
+        #     if reach:
+        #         reward += 0.4
+
 
         return reward, arrive, reach, done
 
@@ -274,48 +290,54 @@ class Env1():
             self.v = 0.
             self.pub_cmd_vel.publish(vel_cmd)
         elif action == 2:
-            self.vx = self.constrain(self.vx + VEL_STEP, -VEL_LIMIT, VEL_LIMIT)
-            self.v = math.hypot(self.vx, self.vy)
-            if VEL_LIMIT > self.v:
-                self.vx = self.constrain(self.vx - VEL_STEP, -VEL_LIMIT, VEL_LIMIT)
-            vel_cmd.linear.x = self.vx
-            vel_cmd.linear.y = self.vy
+            # self.vx = self.constrain(self.vx + VEL_STEP, -VEL_LIMIT, VEL_LIMIT)
+            # self.v = math.hypot(self.vx, self.vy)
+            # if VEL_LIMIT > self.v:
+            #     self.vx = self.constrain(self.vx - VEL_STEP, -VEL_LIMIT, VEL_LIMIT)
+            # vel_cmd.linear.x = self.vx
+            # vel_cmd.linear.y = self.vy
+            vel_cmd.linear.x = 0.3
+            vel_cmd.angular.z = 0.0
             self.pub_cmd_vel.publish(vel_cmd)
         elif action == 3:
-            self.vx = self.constrain(self.vx - VEL_STEP, -VEL_LIMIT, VEL_LIMIT)
-            self.v = math.hypot(self.vx, self.vy)
-            vel_cmd.linear.x = self.vx
-            vel_cmd.linear.y = self.vy
+            # self.vx = self.constrain(self.vx - VEL_STEP, -VEL_LIMIT, VEL_LIMIT)
+            # self.v = math.hypot(self.vx, self.vy)
+            # vel_cmd.linear.x = self.vx
+            # vel_cmd.linear.y = self.vy
+            vel_cmd.linear.x = 0.05
+            vel_cmd.angular.z = 0.3
             self.pub_cmd_vel.publish(vel_cmd)
         elif action == 4:
-            self.vy = self.constrain(self.vy + VEL_STEP, -VEL_LIMIT, VEL_LIMIT)
-            self.v = math.hypot(self.vx, self.vy)
-            if VEL_LIMIT < self.v:
-                self.vy = self.constrain(self.vy - VEL_STEP, -VEL_LIMIT, VEL_LIMIT)
-            vel_cmd.linear.x = self.vx
-            vel_cmd.linear.y = self.vy
+            # self.vy = self.constrain(self.vy + VEL_STEP, -VEL_LIMIT, VEL_LIMIT)
+            # self.v = math.hypot(self.vx, self.vy)
+            # if VEL_LIMIT < self.v:
+            #     self.vy = self.constrain(self.vy - VEL_STEP, -VEL_LIMIT, VEL_LIMIT)
+            # vel_cmd.linear.x = self.vx
+            # vel_cmd.linear.y = self.vy
+            vel_cmd.linear.x = 0.05
+            vel_cmd.angular.z = -0.3
             self.pub_cmd_vel.publish(vel_cmd)
+        # elif action == 5:
+        #     self.vy = self.constrain(self.vy - VEL_STEP, -VEL_LIMIT, VEL_LIMIT)
+        #     self.v = math.hypot(self.vx, self.vy)
+        #     vel_cmd.linear.x = self.vx
+        #     vel_cmd.linear.y = self.vy
+        #     self.pub_cmd_vel.publish(vel_cmd)
         elif action == 5:
-            self.vy = self.constrain(self.vy - VEL_STEP, -VEL_LIMIT, VEL_LIMIT)
-            self.v = math.hypot(self.vx, self.vy)
-            vel_cmd.linear.x = self.vx
-            vel_cmd.linear.y = self.vy
-            self.pub_cmd_vel.publish(vel_cmd)
-        elif action == 6:
             self.pan_ang = self.constrain(self.pan_ang + PAN_STEP, -PAN_LIMIT, PAN_LIMIT)
             self.pan_pub.publish(self.pan_ang)
-        elif action == 7:
+        elif action == 6:
             self.pan_ang = self.constrain(self.pan_ang - PAN_STEP, -PAN_LIMIT, PAN_LIMIT)
             self.pan_pub.publish(self.pan_ang)
-        elif action == 8:
+        elif action == 7:
             self.tilt_ang = self.constrain(self.tilt_ang + TILT_STEP, TILT_MIN_LIMIT, TILT_MAX_LIMIT)
             self.tilt_pub.publish(self.tilt_ang)
-        elif action == 9:
+        elif action == 8:
             self.tilt_ang = self.constrain(self.tilt_ang - TILT_STEP, TILT_MIN_LIMIT, TILT_MAX_LIMIT)
             self.tilt_pub.publish(self.tilt_ang)
 
         else:
-            print ("Error action is from 0 to 9 (10 actions)")
+            print ("Error action is from 0 to 8 (9 actions)")
 
         time.sleep(0.2)
 
@@ -344,8 +366,8 @@ class Env1():
 
         state.append(self.constrain(self.pan_ang / PAN_LIMIT, -1.0, 1.0))
         state.append(self.constrain(self.tilt_ang / TILT_MAX_LIMIT, -1.0, 1.0))
-        state.append(self.constrain(self.vx / VEL_LIMIT, -1.0, 1.0))
-        state.append(self.constrain(self.vy / VEL_LIMIT, -1.0, 1.0))
+        # state.append(self.constrain(self.vx / VEL_LIMIT, -1.0, 1.0))
+        # state.append(self.constrain(self.vy / VEL_LIMIT, -1.0, 1.0))
 
         state.append(diff_angle / 360.0)
         state.append(self.constrain(diff_distance / diagonal_dis, -1.0, 1.0))
@@ -374,7 +396,9 @@ class Env1():
                 self.human_yaw = -round(360 - ang, 2)
             rxp = xp + (distance * math.sin(math.radians(ang)))
             ryp = yp - (distance * math.cos(math.radians(ang)))
-            if rxp < HUMAN_XMAX and rxp > HUMAN_XMIN and ryp < HUMAN_YMAX and ryp > HUMAN_YMIN:
+            human_ud_distance = math.hypot(rxp, ryp)
+            if rxp < HUMAN_XMAX and rxp > HUMAN_XMIN and ryp < HUMAN_YMAX and ryp > HUMAN_YMIN and human_ud_distance > self.max_threshold_arrive+0.5:
+                print human_ud_distance
                 q = quaternion.from_euler_angles(0,0,math.radians(ang))
                 rq.x = q.x
                 rq.y = q.y
@@ -469,8 +493,8 @@ class Env1():
 
         state.append(0.0)
         state.append(TILT_MIN_LIMIT / TILT_MAX_LIMIT)
-        state.append(self.constrain(self.vx / VEL_LIMIT, -1.0, 1.0))
-        state.append(self.constrain(self.vy / VEL_LIMIT, -1.0, 1.0))
+        # state.append(self.constrain(self.vx / VEL_LIMIT, -1.0, 1.0))
+        # state.append(self.constrain(self.vy / VEL_LIMIT, -1.0, 1.0))
 
         state.append(diff_angle / 360.0)
         state.append(self.constrain(diff_distance / diagonal_dis, -1.0, 1.0))
