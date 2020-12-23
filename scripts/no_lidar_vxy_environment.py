@@ -17,7 +17,7 @@ from gazebo_msgs.srv import SpawnModel, DeleteModel
 from gazebo_msgs.msg import ModelStates
 from gazebo_msgs.srv import SetModelState, SetModelStateRequest
 
-out_path = 'environment_output_test_1216_2.txt'
+out_path = 'environment_output_test_1219_1.txt'
 
 goal_model_dir = os.path.join(os.path.split(os.path.realpath(__file__))[0], '..'
                                 , 'models', 'person_standing', 'model.sdf')
@@ -219,10 +219,17 @@ class Env1():
         scan_range.append(min(scan_ranges[648:863]))
         scan_range.append(min(scan_ranges[864:1079]))
 
-        if min_range > min(scan_range) > 0:
-            done = True
+        for i in range(len(rscan.ranges)):
+            if rscan.ranges[i] == float('Inf'):
+                scan_ranges.append(25.0)
+            elif np.isnan(rscan.ranges[i]):
+                scan_ranges.append(0)
+            else:
+                scan_ranges.append(rscan.ranges[i])
+        # if min_range > min(scan_ranges) > 0:
+        #     done = True
 
-        if min_range > min(scan_range) > 0 or diff_hu_distance < INTIMATE_SPACE:
+        if min_range > min(scan_ranges) > 0 or diff_hu_distance < INTIMATE_SPACE:
             done = True
 
         # current_distance = math.hypot(self.goal_projector_position.position.x- self.position.position.x, self.goal_projector_position.position.y - self.position.position.y)
@@ -234,7 +241,7 @@ class Env1():
         # print scan_range
         return scan_range, diff_distance, diff_angle, diff_hu_distance, diff_angle2, diff_hu_angle, done, arrive
 
-    def setReward(self, done, arrive):
+    def setReward(self, done, arrive, diff_hu_angle, diff_distance):
 
         _, reach = self.getProjState()
 
@@ -246,13 +253,38 @@ class Env1():
             filehandle = open(out_path, 'a+')
             filehandle.write("done" + ',' + str(self.goal_projector_position.position.x)+ ',' + str(self.goal_projector_position.position.y) +  ',' + str(self.goal_position.position.x) + ',' + str(self.goal_position.position.y) + "\n")
             filehandle.close()
+        else:
 
-        if arrive and round(self.v, 1) == 0.0:
-            reward = 150
-            done = True
-            filehandle = open(out_path, 'a+')
-            filehandle.write("arrive" + ',' + str(self.goal_projector_position.position.x)+ ',' + str(self.goal_projector_position.position.y) +  ',' + str(self.goal_position.position.x) + ',' + str(self.goal_position.position.y) + "\n")
-            filehandle.close()
+            if arrive and round(self.v, 1) == 0.0:
+                reward = 150
+                done = True
+                filehandle = open(out_path, 'a+')
+                filehandle.write("arrive" + ',' + str(self.goal_projector_position.position.x)+ ',' + str(self.goal_projector_position.position.y) +  ',' + str(self.goal_position.position.x) + ',' + str(self.goal_position.position.y) + "\n")
+                filehandle.close()
+            else:
+                if diff_distance >= self.min_threshold_arrive and diff_distance <= self.max_threshold_arrive:
+                    r_dis = 1
+
+                    if abs(diff_hu_angle) < 15:
+                        r_theta = 2
+                    elif abs(diff_hu_angle) < 45 and abs(diff_hu_angle) >= 15:
+                        r_theta = 1
+                    elif abs(diff_hu_angle) < 75 and abs(diff_hu_angle) >= 45:
+                        r_theta = 1
+                    elif abs(diff_hu_angle) < 105 and abs(diff_hu_angle) >= 75:
+                        r_theta = 0
+                    elif abs(diff_hu_angle) < 135 and abs(diff_hu_angle) >= 105:
+                        r_theta = -1
+                    elif abs(diff_hu_angle) < 165 and abs(diff_hu_angle) >= 135:
+                        r_theta = -2
+                    elif abs(diff_distance) <= 180 and abs(diff_hu_angle) >= 165:
+                        r_theta = -3
+
+                else:
+                    r_dis = 0
+                    r_theta = 0
+                reward = r_dis * r_theta
+
 
         # else:
         #     if arrive:
@@ -376,7 +408,7 @@ class Env1():
         state.append(diff_hu_angle / 180.0)
 
         # print state
-        reward, arrive, reach, done = self.setReward(done, arrive)
+        reward, arrive, reach, done = self.setReward(done, arrive, diff_hu_angle, diff_distance)
 
         return np.asarray(state), reward, done, reach, arrive
 
