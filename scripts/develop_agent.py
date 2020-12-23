@@ -20,8 +20,8 @@ import matplotlib.pyplot as plt
 
 os.environ['ROS_MASTER_URI'] = "http://localhost:11311" + '/'
 
-out_path = 'env_max_200_output_test_1218_1.txt'
-loss_out_path = 'env_max_200_output_loss_test_1218_1.txt'
+out_path = 'env_max_200_output_test_1223_3.txt'
+loss_out_path = 'env_max_200_output_loss_test_1223_3.txt'
 is_training = True
 
 continue_execution = False
@@ -59,11 +59,11 @@ if __name__ == '__main__':
         learningRate = 0.00025
         discountFactor = 0.99
         memorySize = 1000000
-        network_inputs = 12
-        network_outputs = 9
+        network_inputs = 9
+        network_outputs = 8
 
         ### number of hiddenLayer ###
-        network_structure = [112,56,28]
+        network_structure = [56,28]
         current_epoch = 0
 
         deepQ = deepq.DeepQ(network_inputs, network_outputs, memorySize, discountFactor, learningRate, learnStart)
@@ -120,6 +120,8 @@ if __name__ == '__main__':
             qValues1 = deepQ.getQValues(observation1)
             action1 = deepQ.selectAction(qValues1, explorationRate)
             newObservation1, reward1, done1, arrive1, reach1  = env1.step(action1, last_action1)
+            if episode_step == 149:
+                reward1 = -150
             last_action1 = action1
             cumulated_reward1 += reward1
             if highest_reward < cumulated_reward1:
@@ -139,7 +141,7 @@ if __name__ == '__main__':
 
             episode_step = i + 1
 
-            if reward1 == 150:
+            if reward1 == 200:
                 service_count1 += 1
                 done1 = True
 

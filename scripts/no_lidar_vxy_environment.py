@@ -17,7 +17,7 @@ from gazebo_msgs.srv import SpawnModel, DeleteModel
 from gazebo_msgs.msg import ModelStates
 from gazebo_msgs.srv import SetModelState, SetModelStateRequest
 
-out_path = 'environment_output_test_1219_1.txt'
+out_path = 'environment_output_test_1223_3.txt'
 
 goal_model_dir = os.path.join(os.path.split(os.path.realpath(__file__))[0], '..'
                                 , 'models', 'person_standing', 'model.sdf')
@@ -39,7 +39,7 @@ HUMAN_XMIN = -2.8
 HUMAN_YMAX = 5.0
 HUMAN_YMIN = 1.5
 
-diagonal_dis = math.hypot(2.0*HUMAN_XMAX, HUMAN_YMAX+2.0)
+diagonal_dis = math.hypot(2.0*HUMAN_XMAX, HUMAN_YMAX)
 
 class Env1():
     def __init__(self, is_training, ROS_MASTER_URI):
@@ -213,11 +213,13 @@ class Env1():
                 scan_ranges.append(0)
             else:
                 scan_ranges.append(fscan.ranges[i])
-        scan_range.append(min(scan_ranges[0:215]))
-        scan_range.append(min(scan_ranges[216:431]))
+        # scan_range.append(min(scan_ranges[0:215]))
+        # scan_range.append(min(scan_ranges[216:431]))
         scan_range.append(min(scan_ranges[432:647]))
-        scan_range.append(min(scan_ranges[648:863]))
-        scan_range.append(min(scan_ranges[864:1079]))
+        # scan_range.append(min(scan_ranges[648:863]))
+        # scan_range.append(min(scan_ranges[864:1079]))
+
+        # scan_ranges = []
 
         for i in range(len(rscan.ranges)):
             if rscan.ranges[i] == float('Inf'):
@@ -226,6 +228,7 @@ class Env1():
                 scan_ranges.append(0)
             else:
                 scan_ranges.append(rscan.ranges[i])
+        scan_range.append(min(scan_ranges[1079+432:1079+647]))
         # if min_range > min(scan_ranges) > 0:
         #     done = True
 
@@ -243,47 +246,40 @@ class Env1():
 
     def setReward(self, done, arrive, diff_hu_angle, diff_distance):
 
-        _, reach = self.getProjState()
+        current_projector_distance, reach = self.getProjState()
+        current_distance = math.hypot(self.goal_projector_position.position.x - self.position.position.x, self.goal_projector_position.position.y - self.position.position.y)
 
         reward = -1
 
         if done:
-            reward = -200
+            reward = -150
             self.pub_cmd_vel.publish(Twist())
             filehandle = open(out_path, 'a+')
             filehandle.write("done" + ',' + str(self.goal_projector_position.position.x)+ ',' + str(self.goal_projector_position.position.y) +  ',' + str(self.goal_position.position.x) + ',' + str(self.goal_position.position.y) + "\n")
             filehandle.close()
         else:
 
-            if arrive and round(self.v, 1) == 0.0:
-                reward = 150
+            if reach and arrive:
+                reward = 200
                 done = True
                 filehandle = open(out_path, 'a+')
                 filehandle.write("arrive" + ',' + str(self.goal_projector_position.position.x)+ ',' + str(self.goal_projector_position.position.y) +  ',' + str(self.goal_position.position.x) + ',' + str(self.goal_position.position.y) + "\n")
                 filehandle.close()
             else:
-                if diff_distance >= self.min_threshold_arrive and diff_distance <= self.max_threshold_arrive:
-                    r_dis = 1
-
-                    if abs(diff_hu_angle) < 15:
-                        r_theta = 2
-                    elif abs(diff_hu_angle) < 45 and abs(diff_hu_angle) >= 15:
-                        r_theta = 1
-                    elif abs(diff_hu_angle) < 75 and abs(diff_hu_angle) >= 45:
-                        r_theta = 1
-                    elif abs(diff_hu_angle) < 105 and abs(diff_hu_angle) >= 75:
-                        r_theta = 0
-                    elif abs(diff_hu_angle) < 135 and abs(diff_hu_angle) >= 105:
-                        r_theta = -1
-                    elif abs(diff_hu_angle) < 165 and abs(diff_hu_angle) >= 135:
-                        r_theta = -2
-                    elif abs(diff_distance) <= 180 and abs(diff_hu_angle) >= 165:
-                        r_theta = -3
-
+                if current_distance > self.min_threshold_arrive:
+                    r_c = 150.0 * (self.past_distance - current_distance)
                 else:
-                    r_dis = 0
-                    r_theta = 0
-                reward = r_dis * r_theta
+                    r_c = 150.0 * (current_distance - self.past_distance)
+
+                r_p = 8.0 * (self.past_projector_distance - current_projector_distance)
+
+                # reward = self.constrain(1 - (r_c + r_p + abs(self.v)), -1, 1)
+                # print ("r_c: ",r_c, "r_p: ", r_p)
+                reward = r_c * r_p
+                # print ("reward: ",reward)
+                # print " "
+        self.past_distance = current_distance
+        self.past_projector_distance = current_projector_distance
 
 
         # else:
@@ -328,7 +324,7 @@ class Env1():
             #     self.vx = self.constrain(self.vx - VEL_STEP, -VEL_LIMIT, VEL_LIMIT)
             # vel_cmd.linear.x = self.vx
             # vel_cmd.linear.y = self.vy
-            vel_cmd.linear.x = 0.3
+            vel_cmd.linear.x = 0.1
             vel_cmd.angular.z = 0.0
             self.pub_cmd_vel.publish(vel_cmd)
         elif action == 3:
@@ -336,40 +332,40 @@ class Env1():
             # self.v = math.hypot(self.vx, self.vy)
             # vel_cmd.linear.x = self.vx
             # vel_cmd.linear.y = self.vy
-            vel_cmd.linear.x = 0.05
-            vel_cmd.angular.z = 0.3
+            vel_cmd.linear.x = -0.1
+            vel_cmd.angular.z = 0.0
             self.pub_cmd_vel.publish(vel_cmd)
-        elif action == 4:
-            # self.vy = self.constrain(self.vy + VEL_STEP, -VEL_LIMIT, VEL_LIMIT)
-            # self.v = math.hypot(self.vx, self.vy)
-            # if VEL_LIMIT < self.v:
-            #     self.vy = self.constrain(self.vy - VEL_STEP, -VEL_LIMIT, VEL_LIMIT)
-            # vel_cmd.linear.x = self.vx
-            # vel_cmd.linear.y = self.vy
-            vel_cmd.linear.x = 0.05
-            vel_cmd.angular.z = -0.3
-            self.pub_cmd_vel.publish(vel_cmd)
+        # elif action == 4:
+        #     # self.vy = self.constrain(self.vy + VEL_STEP, -VEL_LIMIT, VEL_LIMIT)
+        #     # self.v = math.hypot(self.vx, self.vy)
+        #     # if VEL_LIMIT < self.v:
+        #     #     self.vy = self.constrain(self.vy - VEL_STEP, -VEL_LIMIT, VEL_LIMIT)
+        #     # vel_cmd.linear.x = self.vx
+        #     # vel_cmd.linear.y = self.vy
+        #     vel_cmd.linear.x = 0.05
+        #     vel_cmd.angular.z = -0.3
+        #     self.pub_cmd_vel.publish(vel_cmd)
         # elif action == 5:
         #     self.vy = self.constrain(self.vy - VEL_STEP, -VEL_LIMIT, VEL_LIMIT)
         #     self.v = math.hypot(self.vx, self.vy)
         #     vel_cmd.linear.x = self.vx
         #     vel_cmd.linear.y = self.vy
         #     self.pub_cmd_vel.publish(vel_cmd)
-        elif action == 5:
+        elif action == 4:
             self.pan_ang = self.constrain(self.pan_ang + PAN_STEP, -PAN_LIMIT, PAN_LIMIT)
             self.pan_pub.publish(self.pan_ang)
-        elif action == 6:
+        elif action == 5:
             self.pan_ang = self.constrain(self.pan_ang - PAN_STEP, -PAN_LIMIT, PAN_LIMIT)
             self.pan_pub.publish(self.pan_ang)
-        elif action == 7:
+        elif action == 6:
             self.tilt_ang = self.constrain(self.tilt_ang + TILT_STEP, TILT_MIN_LIMIT, TILT_MAX_LIMIT)
             self.tilt_pub.publish(self.tilt_ang)
-        elif action == 8:
+        elif action == 7:
             self.tilt_ang = self.constrain(self.tilt_ang - TILT_STEP, TILT_MIN_LIMIT, TILT_MAX_LIMIT)
             self.tilt_pub.publish(self.tilt_ang)
 
         else:
-            print ("Error action is from 0 to 8 (9 actions)")
+            print ("Error action is from 0 to 7 (8 actions)")
 
         time.sleep(0.2)
 
@@ -418,25 +414,17 @@ class Env1():
         rxp = 0.
         ryp = 0.
         rq = Quaternion()
-        while True:
-            xp = random.uniform(HUMAN_XMIN, HUMAN_XMAX)
-            yp = random.uniform(HUMAN_YMIN, HUMAN_YMAX)
-            ang = int(random.uniform(0, 360))
-            if ang <= 180:
-                self.human_yaw = round(ang, 2)
-            else:
-                self.human_yaw = -round(360 - ang, 2)
-            rxp = xp + (distance * math.sin(math.radians(ang)))
-            ryp = yp - (distance * math.cos(math.radians(ang)))
-            human_ud_distance = math.hypot(rxp, ryp)
-            if rxp < HUMAN_XMAX and rxp > HUMAN_XMIN and ryp < HUMAN_YMAX and ryp > HUMAN_YMIN and human_ud_distance > self.max_threshold_arrive+0.5:
-                print human_ud_distance
-                q = quaternion.from_euler_angles(0,0,math.radians(ang))
-                rq.x = q.x
-                rq.y = q.y
-                rq.z = q.z
-                rq.w = q.w
-                break
+        xp = random.uniform(-2.8, 2.8)
+        yp = random.uniform(2.6, 5.0)
+        ang = 0
+        rxp = xp + (distance * math.sin(math.radians(ang)))
+        ryp = yp - (distance * math.cos(math.radians(ang)))
+        q = quaternion.from_euler_angles(0,0,math.radians(ang))
+        rq.x = q.x
+        rq.y = q.y
+        rq.z = q.z
+        rq.w = q.w
+        self.human_yaw = 0
         return xp, yp, rxp, ryp, rq
 
     def reset(self):
@@ -519,6 +507,11 @@ class Env1():
             self.pause_proxy()
         except (rospy.ServiceException) as e:
             print ("/gazebo/pause_physics service call failed")
+
+        current_projector_distance, reach = self.getProjState()
+        current_distance = math.hypot(self.goal_projector_position.position.x - self.position.position.x, self.goal_projector_position.position.y - self.position.position.y)
+        self.past_distance = current_distance
+        self.past_projector_distance = current_projector_distance
 
         state, diff_distance, diff_angle, diff_hu_distance, diff_angle2, diff_hu_angle, done, arrive = self.getState(front_data,rear_data)
         state = [i / 25. for i in state]
