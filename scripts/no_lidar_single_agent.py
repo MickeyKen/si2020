@@ -20,13 +20,13 @@ import matplotlib.pyplot as plt
 
 os.environ['ROS_MASTER_URI'] = "http://localhost:11311" + '/'
 
-out_path = 'env_max_200_output_test_1207_1.txt'
-loss_out_path = 'env_max_200_output_loss_test_1207_1.txt'
+out_path = 'env_max_200_output_test_1227_1.txt'
+loss_out_path = 'env_max_200_output_loss_test_1227_1.txt'
 is_training = True
 
-continue_execution = False
-weight_file = "700.h5"
-params_json  = '700.json'
+continue_execution = True
+weight_file = "2750.h5"
+params_json  = '2750.json'
 
 def plot(x1,y1,x2,y2,cumulated_reward):
     xx.append(epoch+1)
@@ -119,7 +119,7 @@ if __name__ == '__main__':
 
             qValues1 = deepQ.getQValues(observation1)
             action1 = deepQ.selectAction(qValues1, explorationRate)
-            newObservation1, reward1, done1, arrive1, reach1  = env1.step(action1, last_action1)
+            newObservation1, reward1, done1, arrive1, reach1  = env1.step(action1, last_action1,i)
             last_action1 = action1
             cumulated_reward1 += reward1
             if highest_reward < cumulated_reward1:

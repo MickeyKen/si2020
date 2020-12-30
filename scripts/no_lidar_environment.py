@@ -11,11 +11,14 @@ import time
 from std_msgs.msg import Float64, Int32, Float64MultiArray
 from geometry_msgs.msg import Twist, Point, Pose, Vector3, Quaternion
 from sensor_msgs.msg import LaserScan, JointState
-# from nav_msgs.msg import Odometry
+from nav_msgs.msg import Odometry
 from std_srvs.srv import Empty
 from gazebo_msgs.srv import SpawnModel, DeleteModel
 from gazebo_msgs.msg import ModelStates
 from gazebo_msgs.srv import SetModelState, SetModelStateRequest
+from tf.transformations import euler_from_quaternion, quaternion_from_euler
+
+out_path = 'environment_output_test_1227_1.txt'
 
 diagonal_dis = 6.68
 goal_model_dir = os.path.join(os.path.split(os.path.realpath(__file__))[0], '..'
@@ -28,6 +31,11 @@ TILT_MAX_LIMIT = math.radians(90) - math.atan(1.5/0.998)
 PAN_STEP = math.radians(15)
 TILT_STEP = math.radians(3)
 
+HUMAN_XMAX = 2.8
+HUMAN_XMIN = -2.8
+HUMAN_YMAX = 5.0
+HUMAN_YMIN = 3.0
+
 class Env1():
     def __init__(self, is_training, ROS_MASTER_URI):
         os.environ['ROS_MASTER_URI'] = "http://localhost:" + str(ROS_MASTER_URI) + '/'
@@ -37,7 +45,9 @@ class Env1():
         self.goal_projector_position = Pose()
 
         self.pub_cmd_vel = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
-        self.sub_odom = rospy.Subscriber('/gazebo/model_states', ModelStates, self.getPose)
+        # self.sub_odom = rospy.Subscriber('/gazebo/model_states', ModelStates, self.getPose)
+
+        self.sub_odom = rospy.Subscriber('odom', Odometry, self.getOdometry)
 
         self.reset_proxy = rospy.ServiceProxy('gazebo/reset_world', Empty)
         self.unpause_proxy = rospy.ServiceProxy('gazebo/unpause_physics', Empty)
@@ -85,6 +95,26 @@ class Env1():
 
         return goal_distance
 
+    def getOdometry(self, odom):
+        self.position = odom.pose.pose.position
+        self.ud_x = self.position.x
+        self.v = odom.twist.twist.linear.x
+        orientation = odom.pose.pose.orientation
+        orientation_list = [orientation.x, orientation.y, orientation.z, orientation.w]
+        _, _, yaw = euler_from_quaternion(orientation_list)
+        self.yaw = 0
+
+        # goal_angle = math.atan2(self.goal_y - self.position.y, self.goal_x - self.position.x)
+        #
+        # heading = goal_angle - yaw
+        # if heading > pi:
+        #     heading -= 2 * pi
+        #
+        # elif heading < -pi:
+        #     heading += 2 * pi
+        #
+        # self.heading = round(heading, 2)
+
     def getPose(self, pose):
         self.position = pose.pose[pose.name.index("ubiquitous_display")]
         self.ud_x = pose.pose[pose.name.index("ubiquitous_display")].position.x
@@ -106,14 +136,16 @@ class Env1():
 
         radian = math.radians(self.yaw) + self.pan_ang + math.radians(90)
         distance = 0.998 * math.tan(math.radians(90) - self.tilt_ang)
-        self.projector_position.position.x = distance * math.cos(radian) + self.position.position.x
-        self.projector_position.position.y = distance * math.sin(radian) + self.position.position.y
+        self.projector_position.position.x = distance * math.cos(radian) + self.position.x
+        self.projector_position.position.y = distance * math.sin(radian) + self.position.y
         diff = math.hypot(self.goal_projector_position.position.x - self.projector_position.position.x, self.goal_projector_position.position.y - self.projector_position.position.y)
         # print ("now: ", self.projector_position.position.x, self.projector_position.position.y)
         # print ("goal: ", self.goal_projector_position.position.x, self.goal_projector_position.position.y)
         if diff <= self.threshold_arrive:
             # done = True
             reach = True
+        # print ("position x: ", round(self.position.x,1))
+        # print ("projector x: ", round(self.projector_position.position.x,1), ",projector y: ", round(self.projector_position.position.y,1))
         return diff, reach
 
     def getState(self, scan):
@@ -123,9 +155,9 @@ class Env1():
         done = False
         arrive = False
 
-        rel_dis_x = round(self.goal_projector_position.position.x - self.position.position.x, 1)
-        rel_dis_y = round(self.goal_projector_position.position.y - self.position.position.y, 1)
-        diff_distance = math.hypot(self.goal_projector_position.position.x- self.position.position.x, self.goal_projector_position.position.y - self.position.position.y)
+        rel_dis_x = round(self.goal_projector_position.position.x - self.position.x, 1)
+        rel_dis_y = round(self.goal_projector_position.position.y - self.position.y, 1)
+        diff_distance = math.hypot(rel_dis_x, rel_dis_y)
 
         if rel_dis_x > 0 and rel_dis_y > 0:
             theta = math.atan(rel_dis_y / rel_dis_x)
@@ -169,7 +201,7 @@ class Env1():
 
         return scan_range, diff_distance, yaw, diff_angle, diff_distance, done, arrive
 
-    def setReward(self, done, arrive):
+    def setReward(self, done, arrive, step):
 
         _, reach = self.getProjState()
 
@@ -178,23 +210,36 @@ class Env1():
         if done:
             reward = -200
             self.pub_cmd_vel.publish(Twist())
-
-        if arrive and reach and round(self.v, 1) == 0.0:
-            reward = 150
-            done = True
-
+            filehandle = open(out_path, 'a+')
+            filehandle.write("done" + ',' + str(self.goal_projector_position.position.x)+ ',' + str(self.goal_projector_position.position.y) +  ',' + str(self.goal_position.position.x) + ',' + str(self.goal_position.position.y) + "\n")
+            filehandle.close()
         else:
-            if arrive:
-                reward += 0.4
-            if reach:
-                reward += 0.4
-            if round(self.v, 1) == 0.0:
-                reward += 0.2
+
+            if step == 149:
+                filehandle = open(out_path, 'a+')
+                filehandle.write("timeout" + ',' + str(self.goal_projector_position.position.x)+ ',' + str(self.goal_projector_position.position.y) +  ',' + str(self.goal_position.position.x) + ',' + str(self.goal_position.position.y) + "\n")
+                filehandle.close()
+
+            else:
+                if arrive and reach:
+                    reward = 150
+                    done = True
+                    filehandle = open(out_path, 'a+')
+                    filehandle.write("arrive" + ',' + str(self.goal_projector_position.position.x)+ ',' + str(self.goal_projector_position.position.y) +  ',' + str(self.goal_position.position.x) + ',' + str(self.goal_position.position.y) + "\n")
+                    filehandle.close()
+
+        # else:
+        #     if arrive:
+        #         reward += 0.4
+        #     if reach:
+        #         reward += 0.4
+        #     if round(self.v, 1) == 0.0:
+        #         reward += 0.2
 
         return reward, arrive, reach, done
 
 
-    def step(self, action, past_action):
+    def step(self, action, past_action, step):
         rospy.wait_for_service('/gazebo/unpause_physics')
         try:
             self.unpause_proxy()
@@ -254,7 +299,7 @@ class Env1():
         state.append(self.constrain(diff_distance / diagonal_dis, -1.0, 1.0))
         # print state
         # state = state + [yaw / 360, rel_theta / 360, diff_angle / 180]
-        reward, arrive, reach, done = self.setReward(done, arrive)
+        reward, arrive, reach, done = self.setReward(done, arrive,step)
 
         return np.asarray(state), reward, done, reach, arrive
 
@@ -264,16 +309,31 @@ class Env1():
         rxp = 0.
         ryp = 0.
         rq = Quaternion()
-        xp = random.uniform(-2.8, 2.8)
-        yp = random.uniform(3.0, 5.0)
-        ang = 0
-        rxp = xp + (distance * math.sin(math.radians(ang)))
-        ryp = yp - (distance * math.cos(math.radians(ang)))
-        q = quaternion.from_euler_angles(0,0,math.radians(ang))
-        rq.x = q.x
-        rq.y = q.y
-        rq.z = q.z
-        rq.w = q.w
+        # xp = random.uniform(-2.8, 2.8)
+        # yp = random.uniform(3.0, 5.0)
+        # ang = 0
+        # rxp = xp + (distance * math.sin(math.radians(ang)))
+        # ryp = yp - (distance * math.cos(math.radians(ang)))
+        # q = quaternion.from_euler_angles(0,0,math.radians(ang))
+        # rq.x = q.x
+        # rq.y = q.y
+        # rq.z = q.z
+        # rq.w = q.w
+        while True:
+            xp = random.uniform(HUMAN_XMIN, HUMAN_XMAX)
+            yp = random.uniform(HUMAN_YMIN, HUMAN_YMAX)
+            ang = 0
+            rxp = xp + (distance * math.sin(math.radians(ang)))
+            ryp = yp - (distance * math.cos(math.radians(ang)))
+            human_ud_distance = math.hypot(rxp, ryp)
+            if rxp < HUMAN_XMAX and rxp > HUMAN_XMIN and ryp < HUMAN_YMAX and ryp > HUMAN_YMIN - distance and human_ud_distance > self.max_threshold_arrive+0.5:
+                # print human_ud_distance
+                q = quaternion.from_euler_angles(0,0,math.radians(ang))
+                rq.x = q.x
+                rq.y = q.y
+                rq.z = q.z
+                rq.w = q.w
+                break
         return xp, yp, rxp, ryp, rq
 
     def reset(self):
