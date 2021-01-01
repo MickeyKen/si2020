@@ -18,7 +18,7 @@ from gazebo_msgs.msg import ModelStates
 from gazebo_msgs.srv import SetModelState, SetModelStateRequest
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
-out_path = 'environment_output_test_1227_1.txt'
+out_path = 'environment_output_test_0101_1.txt'
 
 diagonal_dis = 6.68
 goal_model_dir = os.path.join(os.path.split(os.path.realpath(__file__))[0], '..'
@@ -32,7 +32,7 @@ PAN_STEP = math.radians(15)
 TILT_STEP = math.radians(3)
 
 HUMAN_XMAX = 2.8
-HUMAN_XMIN = -2.8
+HUMAN_XMIN = 0.0
 HUMAN_YMAX = 5.0
 HUMAN_YMIN = 3.0
 
@@ -204,6 +204,8 @@ class Env1():
     def setReward(self, done, arrive, step):
 
         _, reach = self.getProjState()
+        # current_projector_distance, reach = self.getProjState()
+        # current_distance = math.hypot(self.goal_projector_position.position.x - self.position.x, self.goal_projector_position.position.y - self.position.y)
 
         reward = -1
 
@@ -228,13 +230,23 @@ class Env1():
                     filehandle.write("arrive" + ',' + str(self.goal_projector_position.position.x)+ ',' + str(self.goal_projector_position.position.y) +  ',' + str(self.goal_position.position.x) + ',' + str(self.goal_position.position.y) + "\n")
                     filehandle.close()
 
-        # else:
-        #     if arrive:
-        #         reward += 0.4
-        #     if reach:
-        #         reward += 0.4
-        #     if round(self.v, 1) == 0.0:
-        #         reward += 0.2
+        #         else:
+        #             diff_pos = self.past_distance - current_distance
+        #             diff_projector_pos = self.past_projector_distance - current_projector_distance
+        #
+        #             # if current_distance > self.min_threshold_arrive:
+        #             r_c = 150.0 * abs(self.past_distance - current_distance)
+        #
+        #             r_p = 8.0 * abs(self.past_projector_distance - current_projector_distance)
+        #
+        #             if diff_pos < 0 or diff_projector_pos < 0:
+        #                 reward = -((r_c+0.1) * r_p)
+        #             else:
+        #                 reward = (r_c+0.1) * r_p
+        #
+        #
+        # self.past_distance = current_distance
+        # self.past_projector_distance = current_projector_distance
 
         return reward, arrive, reach, done
 
@@ -247,14 +259,16 @@ class Env1():
             print ("/gazebo/unpause_physics service call failed")
 
         vel_cmd = Twist()
+        # if action == 0:
+        #     self.pub_cmd_vel.publish(vel_cmd)
         if action == 0:
+            vel_cmd.linear.x = 0.2
             self.pub_cmd_vel.publish(vel_cmd)
         elif action == 1:
-            vel_cmd.linear.x = 0.1
+            vel_cmd.linear.x = -0.2
             self.pub_cmd_vel.publish(vel_cmd)
         elif action == 2:
-            vel_cmd.linear.x = -0.1
-            self.pub_cmd_vel.publish(vel_cmd)
+            pass
         elif action == 3:
             self.pan_ang = self.constrain(self.pan_ang + PAN_STEP, -PAN_LIMIT, PAN_LIMIT)
             self.pan_pub.publish(self.pan_ang)
@@ -268,7 +282,7 @@ class Env1():
             self.tilt_ang = self.constrain(self.tilt_ang - TILT_STEP, TILT_MIN_LIMIT, TILT_MAX_LIMIT)
             self.tilt_pub.publish(self.tilt_ang)
         elif action == 7:
-            pass
+            self.pub_cmd_vel.publish(vel_cmd)
         else:
             print ("Error action is from 0 to 6")
 
